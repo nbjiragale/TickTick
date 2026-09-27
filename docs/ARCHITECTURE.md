@@ -1,6 +1,34 @@
 # TickTick personal app architecture
 
-Status: proposed implementation architecture, 2026-09-05. This document specifies the design; it does not indicate that features are implemented.
+Sound settings (2026-09-25): Settings has four independently persisted built-in Android tone choices: task completion, notification, habit completion and reminder popup. AppSounds reuses Room UI preferences and owns bounded in-app playback; committed mutation callbacks drive completion audio without replay on database observation. The old habit ringtone entry now shares Notification. Background notifications select a sound-specific notification or popup channel so a popup reminder has one audio source. No schema/dependency/media-permission changes. See the [backend plan](BACKEND_IMPLEMENTATION_PLAN.md) for exact defaults, paths and build-only evidence; device audio remains unverified.
+
+Reminder popup correction (2026-09-25): a non-exported translucent ReminderPopupActivity in its own task reuses the task ReminderHost and habit check-in screen for fresh background alerts. User-granted display-over-other-apps access enables the supported background-activity exception; lock-screen delivery uses a permitted notification full-screen intent. Channels, Do Not Disturb and habit Auto pop-up remain authoritative, and notification fallback survives popup denial. MainActivity reminder presentation requires RESUMED state. No service, dependency or schema changes are needed. See the [backend plan](BACKEND_IMPLEMENTATION_PLAN.md) for source paths, permission setup, build evidence and pending device acceptance.
+
+Backend B5 update (2026-09-25): schema 5 adds versioned UI preference and editor-draft records through `RoomUiStateRepository`, with explicit migration 4-to-5. Startup gates on both repository loads. Presentation/completed settings are per task destination; Calendar mode/date/completed settings are independent. Application-owned ordered draft writes retain task/habit edits across editor disposal, with failure/retry feedback and session/version tombstones. Task/habit saves clear their acknowledged draft atomically; planning task actions commit their review checkpoint in the same transaction. Resolved NLP predictions, manual schedules and interrupted attachment-import markers are retained without storing media bytes. Task/date/zone queries refresh on resume and at midnight; Habit home and Calendar consume the shared date. The [backend plan](BACKEND_IMPLEMENTATION_PLAN.md) records policies, changed paths and build-only evidence. B1-B5 are implemented with runtime acceptance pending; attachment ownership/recovery is next in B6. Earlier references to session-only preferences/drafts are historical.
+
+Backend B4 update (2026-09-24): `RoomTaskRepository` is the shared transaction coordinator for tasks, its `HabitRepository` facade and durable reminders. Schema 4 adds habits, effective schedule revisions, canonical dated quantities, ordered sections and habit settings, with migration 3-to-4. `HabitRules` derives completion, weekly targets, finite goals and streaks from those quantities and historical configurations; no writable completed-date mirror remains. Habits, Tasks List and Calendar observe the same committed snapshot. The existing reminder outbox/platform pipeline now supports multiple habit times, check-in/dismiss actions, selected sound, conditional foreground log opening and silent missed summaries. Production databases start without sample habits. See the [backend plan](BACKEND_IMPLEMENTATION_PLAN.md) for precise policies, changed paths and build evidence. B1-B4 are implemented with runtime acceptance pending; preferences/drafts beyond habit settings remain B5. This supersedes historical session-only habit and deferred reminder/streak descriptions below.
+
+Backend B1 update (2026-09-18): `AppContainer` now uses `RoomTaskRepository` for tasks in both build variants. Schema 1 stores tasks, organization, child records and snooze; repository writes are suspending and revision-checked, and UI startup/save failures are explicit. Habits, holidays and Focus retain their prior storage behavior. Fresh task databases initialize only Inbox. See the [backend plan](BACKEND_IMPLEMENTATION_PLAN.md) for implementation details and build-only verification; historical session-only task descriptions below are superseded.
+
+Backend planning update (2026-09-16): read the [backend implementation plan](BACKEND_IMPLEMENTATION_PLAN.md) first for the current backend checkpoint, delivery order and verification status. The user has requested backend planning now, ahead of unfinished UI acceptance; the historical UI-first gates below do not block that planning. No backend implementation is completed by this documentation update.
+
+Drawer Add increment (2026-09-09): `feature/organization` provides shared full-screen form/color components plus a Normal/Advanced filter editor. TaskRepository creates colored lists with an initial view, explicit tags and SavedTaskFilter records; TaskSnapshot merges explicit and task-derived tags. Pure FilterRule matching supports live result queries/counts through new tag/saved-filter TaskFilter variants. Creation uses existing session storage and SavedStateHandle-based view navigation; durable management remains deferred. See [reference notes](references/DRAWER_ADD_REFERENCES.md).
+
+List habits / daily alert toggle follow-up (2026-09-08): the Tasks shell passes the existing HabitSnapshot into List layout. Scheduled habit occurrences are derived separately from TaskGroup and use the existing check-in screen with a return-to-list callback. Kanban remains task-only. `TasksViewModel` exposes `dailyAlertsEnabled`, derived from the enabled date in SavedStateHandle and the injected clock. The daily switch is an animated, accessible UI preference; notification delivery integration and durable storage remain deferred. This supersedes earlier task-only placement statements for home List layout. See [reference notes](references/TASK_VIEW_REFERENCES.md).
+
+Task view increment (2026-09-08): `TasksViewModel` combines shared records with per-destination `TaskPresentation` preferences held in SavedStateHandle. Pure sorting/grouping helpers produce shared List/Kanban groups without duplicating task records. Task timestamps are assigned by the session repository with the injected clock, and unchanged saves preserve modification time. The reference popup and background/group-sort sheets use the shared design system; a bounded local-image decoder is shared with attachments. Task Manage Section, View Options and Share are excluded by the user's correction; earlier target references to task sections below are superseded. See [task-view notes](references/TASK_VIEW_REFERENCES.md). Debug APK assembly passed; runtime/visual checks remain pending.
+
+Calendar views increment (2026-09-08): the second tab now provides List, Day, Week and Month views in `feature/calendar`, deriving per-date task/habit/holiday occurrences from the shared repositories. A read-only in-memory `HolidayRepository` joins the container; debug seeds clearly labeled sample holidays (no region assumed) and the legend shows the source label. Selected date/view live in saveable tab state; repeat rules are not expanded into occurrences. Build-only validation. See the tenth increment below.
+
+Tasks/Calendar correction (2026-09-08): `TasksScreen` is task-only again. The root passes `HabitSnapshot` to `CalendarContent`, which derives scheduled active habits for its own selected date alongside tasks. Habit selection carries the calendar occurrence date into check-in. The user's explicit placement correction supersedes the earlier Today/Upcoming habit integration described below.
+
+Habit check-in increment (2026-09-08): `HabitCheckInScreen` receives a habit ID-resolved record and local date. Home, library and task occurrence routes open it before the editor. `HabitSnapshot.progress` and completed dates update atomically through `HabitRepository.setProgress`; date eligibility uses the injected clock. Delete removes the record plus both history maps. Sharing uses Android's chooser; illustration rendering is local Compose Canvas. Basic check-in/undo is implemented, while celebration/streak/goal lifecycle and production storage/reminders remain deferred. Build-only validation passed.
+
+Habit management increment (2026-09-08): `HabitSnapshot` also owns `HabitSettings`; records have an archive flag. Repository mutations preserve check-in history while archiving/restoring. `habitsFor(date)` shares schedule/archive filtering and check-in sorting between Habits and the optional Today/Upcoming habit occurrences. Full-screen library/settings/sections pages replace provisional dialogs. Ringtone selection stores an Android notification-sound URI; actual sound and launcher-badge delivery remain deferred. See [reference notes](references/HABIT_REFERENCES.md).
+
+Latest increment (2026-09-07): Habits home and custom creation now use `feature/habits`, the plain Kotlin `Habit`/`HabitSnapshot` models, and an application-scoped `HabitRepository` with an in-memory implementation. The editor stages a saveable draft and child picker choices, while home observes shared records and sections. The corrected screenshot mappings, interaction scope and build-only validation are in [Habits references](references/HABIT_REFERENCES.md). Check-in execution, durable storage and alarm delivery remain subsequent work; earlier placeholder descriptions below are historical.
+
+Status: UI implementation in progress; source reviewed 2026-09-06. Section 2 records implemented increments. Later sections describe the target architecture and do not by themselves indicate implemented features.
 
 Product source: [Personal Task & Habit App — Project Details](personal_task_habit_app_project_details.md).
 Delivery checklist: [UI implementation plan](UI_IMPLEMENTATION_PLAN.md).
@@ -15,9 +43,9 @@ The first deliverable is an installable UI demo in which navigation, task editin
 
 ## 2. Existing project
 
-Inspection found one `:app` module, package/application ID `com.niranjan.ticktick`, Compose enabled, and a generated `MainActivity` displaying `Hello Android!`. The theme uses the generated purple palette and enables dynamic color. There are no repositories, feature screens, database, alarm components, or reference screenshots in the inspected project files. No existing graphify graph is present.
+Initial inspection on 2026-09-05 found one `:app` module, package/application ID `com.niranjan.ticktick`, Compose enabled, and a generated `MainActivity` displaying `Hello Android!`. At that point the theme used the generated purple palette with dynamic color, and no repositories, feature screens, database, alarm components, or reference screenshots were present. The increments below supersede that initial inventory. The 2026-09-06 review found no existing graphify graph and inspected source directly.
 
-Current configuration: min SDK 24, target SDK 36, compile SDK 36.1, AGP 9.2.1, Kotlin Compose plugin 2.2.10, Compose BOM 2026.02.01. These are observed settings, not a verified dependency compatibility matrix. Preserve the namespace and baseline; validate the build when implementation begins.
+Initial configuration: min SDK 24, target SDK 36, compile SDK 36.1, AGP 9.2.1, Kotlin Compose plugin 2.2.10, Compose BOM 2026.02.01. Compile SDK is now 37.0, as recorded below and confirmed in `app/build.gradle.kts`; min/target SDK remain 24/36. Preserve the namespace and existing toolchain.
 
 Documentation belongs in root `docs/`. During the first UI implementation, the supplied brief was moved here because Markdown inside `app/src/main/res/docs` prevents Android resource compilation.
 
@@ -28,6 +56,96 @@ The Today and drawer references are now stored in [references](references/README
 This increment uses an application-scoped in-memory repository. Sample records are isolated under `src/debug`; release has an empty Inbox seed, and still uses session-only storage until Room is connected. The container/repository implementation must be replaced before the production gate. Only one full-screen destination is currently developed; Navigation 3 is deferred until full-screen feature flows are added. Reference notes distinguish implementation from the full planned architecture.
 
 Validation for this increment is compilation and debug APK assembly only, per the user's instruction. No emulator or end-to-end tests are run, and pixel parity is not certified from a successful build.
+
+### Second implementation increment — 2026-09-06
+
+Quick Add and full-screen Task Detail now share `TaskEditorViewModel`, with local date parsing, expression suppression, description, priorities, tags, checklist, note mode, and attachment metadata. The simple task-entry dialog has been removed. New task drafts save explicitly; valid existing task edits save after a debounce and flush on Back. A single editor window retains the draft while switching sheet/full-screen presentation. See [editor reference notes](references/EDITOR_REFERENCES.md) for screenshot mappings, the current functional scope, and the basic picker/voice behavior that remains provisional. Navigation 3 and production persistence are still pending. Verification remains compilation and debug assembly only.
+
+### Third implementation increment — 2026-09-06
+
+Date/Duration, time, reminder, and repeat configuration now use shared screenshot-based components in `feature/taskeditor/schedule`. `TaskSchedule`, `TaskDuration`, `ReminderConfig`, and `RepeatRule` are plain Kotlin value types. The picker stages changes until Apply, then updates the editor and shared repository; cancelled child choices preserve the prior selection. Task-row due labels provide a direct entry point. See [schedule reference notes](references/SCHEDULE_REFERENCES.md) for implemented behavior and reference assumptions. Alarm delivery and recurrence execution remain deferred. Current compile SDK is 37.0; verification is debug compilation/assembly only.
+
+### Fourth implementation increment — 2026-09-06
+
+Priority and list selection now use reusable floating menus in `feature/taskeditor/EditorSelectionMenus.kt`, shared by Quick Add and Task Detail. Their values and single active panel remain owned by `TaskEditorViewModel`; the menus receive values/callbacks and do not create another draft or repository. Quick Add positions priority above its flag action and lists above the sheet. Task Detail reuses the rows below its header actions. Menus use the editor's existing dimmed window and preserve IME ownership.
+
+The user clarified that the tag action inserts `#` into the title, while Quick Add's list action inserts `~` and opens the list menu. The basic comma-separated tag dialog has been removed. Inline tags use the existing parser/highlighting; reopening a task reconstructs title-derived tags separately from manual associations so a removed/renamed title tag does not survive as stale metadata. Tag chips focus the matching title label for editing; a separately stored label can be moved into the title for editing. List selection preserves the source text and updates the same draft/list ID used throughout the app. See [organization reference notes](references/ORGANIZATION_REFERENCES.md) for reference dimensions, interaction details, and limitations. Verification remains compilation and debug assembly only; Room, real reminders, and the remaining UI milestones are unchanged.
+
+The 10:15 selected-list reference corrects the final selection state: Quick Add replaces `~` with a highlighted icon/name token such as `~💼Work` and displays the icon/name in its toolbar. `EditorListTokens.kt` centralizes glyphs, token matching, highlight spans, and offset-preserving masking for date/tag parsing. List changes replace the existing token while preserving surrounding title text; `listId` remains authoritative. Both editor presentations and saved-state reconstruction use the same selected list. This adds no repository or persistence layer.
+
+### Fifth implementation increment — 2026-09-06
+
+The screenshot-based attachment menu now opens above Task Detail's paperclip. `AttachmentMenu` reuses editor popup/row primitives; `AttachmentCards` renders shared image/file/audio cards in both editor presentations with open/delete actions. `TaskAttachment` gains optional byte-size metadata with backward-compatible saved-state reconstruction. `TaskEditorViewModel` owns the import job and loading state so asynchronous metadata loading survives ordinary configuration changes and cannot be silently omitted by Save.
+
+`AttachmentActions` centralizes document-picker and external-camera activity results. Camera output is exposed through the narrowly scoped `platform/attachments/AttachmentFileProvider`; selected URI grants are retained where providers permit. Records currently imports existing audio, and Scan Documents offers a document photo or existing PDF/image. In-app recording, automatic scanning, managed-file cleanup, Room-backed attachment ownership, and durable recovery remain later work. Added-attachment card layout is inferred with the user's permission because the reference app blocks it behind premium. See [attachment reference notes](references/ATTACHMENT_REFERENCES.md) for behavior, geometry, storage limits, and compile-only verification. The screenshot's collapsed Task Detail presentation is not part of this menu increment.
+
+### Sixth implementation increment — 2026-09-06
+
+Plan Your Day now opens from the Today lightbulb and Tasks overflow. `feature/planning/PlanYourDayViewModel` maintains a stable review of active non-note IDs and observes live task/list data from the same application-scoped repository. `PlanYourDayScreen` presents a full-screen horizontal pager with Done, Today, Later, Won't Do and confirmed Delete. Swiping browses only; actions target the settled card and advance after a successful update. The user's verbal follow-up replaces the provisional schedule-picker behavior: Today swaps the footer for Morning 10 AM / Afternoon 1 PM / Evening 5 PM / Night 9 PM, and Later swaps it for Tomorrow / 3 days later / Next week (7 days). ViewModel-owned menu state is bound to the displayed task ID; Back or changing cards cancels it. Choosing an option validates the shared `TaskSchedule` and saves through the repository, preserving reminder/repeat configuration and duration length. Planning remains independent of `TaskEditorViewModel`.
+
+`Task.declined` distinguishes Won't Do from completion, while `Task.isActive` centralizes filtering/count behavior. Repository completion and decline operations clear the opposite state. Task rows and Task Detail allow restoration; editor draft serialization preserves declined. Reviews resume within the same day/configuration lifetime, and reset on process restart along with session-only data. Recurrence advancement remains deferred, so Done/Won't Do currently operate on the task record rather than an occurrence. See [planning reference notes](references/PLANNING_REFERENCES.md) for selection/order/progress rules and provisional states.
+
+The user has deferred Templates, Quick Add Settings and Suggested Tasks. Template/settings entries are hidden while their earlier basic implementation remains dormant; the suggestions overlay was removed. Verification remains compilation/debug assembly only, without runtime or visual claims.
+
+### Home date sections — 2026-09-06
+
+The Home/Today destination now has Overdue, Today and Upcoming tabs styled with the existing selected pill. `HomeTaskSection` classifies dated tasks before, on or after the injected local date. `TasksViewModel` owns the selected section through `SavedStateHandle` and combines it with the shared repository and existing completion/sort settings; no second task collection is introduced. Home sections cover every list and sort by due date/time. Undated tasks remain available in Inbox/their list. Completed and declined tasks remain hidden unless Show Completed is enabled. Returning through the drawer's Today action selects Today; ordinary tab/configuration changes retain the selected section. Shared task-row editing, schedule actions and Plan Your Day mutations feed these queries automatically.
+
+Verification: compilation and `:app:assembleDebug --console=plain` passed (6 seconds). Runtime and visual comparison remain unverified under the user's build-only instruction.
+
+### Next increment recommendation — task reminder popup and snooze
+
+Source review on 2026-09-06 confirms that `AppContainer` supplies one application-scoped `TaskRepository` and clock to Tasks, the shared editor, and Plan Your Day. `AppOverlays` currently handles the drawer notification shortcut with a basic "Scheduled tasks" dialog filtering active tasks with a due time. It is not a delivery queue or a reminder history screen. `ReminderConfig` stores offsets, Constant Reminder and a date-only base time; neither `Task` nor the editor currently stores a snooze deadline. Habits is still an empty shell in `TickTickApp`.
+
+The initial recommendation was the remaining task reminder interaction slice of UI-3: an in-app reminder card, Close/Complete, all snooze choices including Custom and Change Date, and a snooze indicator in Task Detail. The seventh and eighth increments below now implement the supplied reminder/Snooze references; Task Detail's snooze presentation remains pending. See the current [reminder reference notes](references/REMINDER_REFERENCES.md).
+
+Planned integration boundaries:
+
+- Add `feature/reminders` with an app-scoped presentation ViewModel and reusable card/snooze controls. It observes shared task records by ID and owns the active overlay; it must not call `TaskEditorViewModel.beginExisting` to deliver an alert or replace an open draft. Host presentation above the editor/planning dialog windows while preserving their state.
+- Keep task reminder delivery/dismissal/snooze state in an application-scoped in-memory contract shared with Task Detail. Separate the snooze instant from `TaskSchedule` and `ReminderConfig`: snoozing leaves the due date/time intact; Change Date stages the shared schedule controls and invalidates obsolete alert state only after Apply. Final types are introduced with implementation, not pre-created here.
+- Use stable alert IDs and a queue so multiple deliveries and repeated actions cannot overwrite another alert or complete twice. Re-read task eligibility for actions and reconcile externally completed, declined, deleted or rescheduled tasks. Recurrence occurrence generation remains deferred; the first slice operates on current task records.
+- Address editor concurrency as part of the slice. Today, `TaskEditorViewModel.save()` writes a complete `Task` reconstructed from its draft. A later save must not undo completion, snooze or a date change applied by a reminder while the editor is open. Use targeted repository mutations and explicit reconciliation of externally changed fields while retaining user-entered text and selection.
+- Provide a clearly identified debug-only simulated delivery entry. This increment does not register Android alarms, issue background/lock-screen notifications, or implement a reminder-center redesign, habit alerts, Room, or actual Constant Reminder delivery. Those remain later work.
+
+Reference capture, including premium-blocked screens, follows the user's screenshots or verbal description. No geometry is inferred for an uncaptured screen without that description. Verification remains compilation and debug APK assembly only; runtime interactions and visual parity remain unverified.
+
+### Seventh reference increment — Snooze and Change Date, 2026-09-06
+
+The supplied references cover Snooze options, Custom Snooze and Change Date; the fourth image repeats Plan Your Day. The fired reminder popup and snoozed Task Detail remain pending. The [reminder reference notes](references/REMINDER_REFERENCES.md) now distinguish the implemented portion from the broader recommendation above.
+
+`feature/reminders/SnoozeViewModel` observes the same `TaskRepository` and injected clock as the other features, retaining only the target ID and small picker values in saved state. `TaskSnapshot.snoozedUntil` holds session deadlines by task ID, outside the editor's serialized task fields. `TaskRepository.snooze` updates this state without changing the due date/time. `changeSchedule` atomically applies schedule fields to the latest record and clears obsolete snooze state. Ordinary task content edits preserve snooze; schedule/status/note/deletion changes invalidate it.
+
+`SnoozeHost` provides the captured two-row menu, custom wrapping hour/minute wheels, keyboard input and resolved-time label. Today Night means 21:00 today and is disabled when passed. Tomorrow preserves the original due time, falling back to the configured date-only reminder time. These named-time choices follow the user's clarification. Change Date invokes the existing `SchedulePicker` with a centered presentation, staged Clear, per-field clear actions and Cancel/OK; the existing editor sheet retains its default presentation.
+
+The app host owns this ViewModel without depending on `TaskEditorViewModel`. A debug-only Preview Snooze action in the existing Scheduled tasks dialog exposes the screens and saved deadline. Release omits that preview entry. This does not implement a fired alert, delivery queue, reminder-center redesign or Task Detail snooze layout. The broader card/interruption work, including protection against stale editor field saves, awaits its references. Separate snooze storage already prevents ordinary editor task serialization from dropping a deadline.
+
+Validation remains compilation/debug APK assembly only. No alarms, persistence, recurrence execution, runtime correctness or visual parity are claimed.
+
+### Eighth reference increment — reminder card and session queue, 2026-09-06
+
+The 18:40 reference supplies the reminder card. `ReminderCard` displays live priority, due date/time, list, title, description and checklist lines, with Snooze/Complete/Close controls. The user identified the circular header action as Focus and explicitly excluded it; the card omits that action. The browser content behind the reference is not part of the app.
+
+`ReminderViewModel` and `ReminderHost` replace the earlier Snooze-only classes. The host is composed after editor/planning hosts and reuses one dialog for the reminder card and Snooze pages. Date editing retains the shared centered child schedule dialog. Back from Snooze returns to the card; Close/Back on the card dismiss only the current alert. Complete, successful Snooze and Change Date update the shared repository and advance the queue.
+
+Queue entries carry a stable delivery ID, task ID and captured schedule/snooze identity. Task/list content is always observed live. Repeated pending deliveries for the same task are ignored. Repository changes reconcile completed, declined, deleted, note-converted, rescheduled and snoozed entries out of the queue. Mutating callbacks retain the ID of the rendered delivery and validate it against the current queue head, avoiding a repeated action against the next card. Queue membership and delayed previews survive ordinary configuration changes with the ViewModel and reset on process restart; no durable occurrence history is implied.
+
+`TaskEditorViewModel` now reconciles externally changed schedule/status fields both when the repository emits and immediately before saving. External reminder schedule/completion changes take precedence for those fields while typed title, description, checklist/attachment edits and text selection remain in the draft. The editor closes an obsolete date picker when the underlying schedule changes. This closes the previously documented stale full-record save problem for reminder interruption. Snooze deadlines remain separately owned by `TaskSnapshot.snoozedUntil`.
+
+Debug Scheduled tasks now offers Preview Reminder, Preview in 10 seconds, and Preview all reminders. The delayed option uses a ViewModel coroutine to make app-wide presentation reachable during editor/planning/tab use; it is not a system alarm. Release omits these entry controls. Actual Android alarm/notification delivery, recurrence execution, Constant Reminder re-alerts, durable persistence and Task Detail's snooze layout remain later work. Verification is compilation/debug assembly only; runtime interruption, keyboard restoration and visual parity are unverified.
+
+### Ninth increment — Task Detail snooze status, 2026-09-07
+
+The user approved a verbal reference: selecting a one-hour snooze at 18:00 produces a 19:00 deadline, displayed as "Snoozed until…" while retaining the original due date/time. The interval starts when Snooze is selected. No additional screenshot is required for this increment.
+
+`TaskEditorHost` reads the current task's deadline from the already observed `TaskSnapshot.snoozedUntil` map and passes it into the full-screen editor. A blue Snooze icon and wrapping status line appear directly below the existing due-date row, using the same Today/Tomorrow/date/time formatter as Custom Snooze and the debug list. This read-only value stays outside the editor draft and task schedule. It updates an open or reopened Task Detail through the shared snapshot. Only existing active non-note tasks with a stored deadline show it; existing repository invalidation clears it after schedule/status/note/deletion changes. Content-only edits preserve it. The original date row retains its schedule-editing action.
+
+Compilation and debug assembly passed on 2026-09-07 (`BUILD SUCCESSFUL in 1m 15s`, no Kotlin warnings). No runtime/device/unit/end-to-end or visual checks were run. Actual reminder delivery and durable storage remain deferred.
+
+### Tenth increment — Calendar views, 2026-09-08
+
+`feature/calendar` replaces the provisional `CalendarContent`. `CalendarScreen` owns the List/Day/Week/Month selector, Today/previous/next navigation, a category legend, and a Show/Hide Completed action bound to the shared `TasksViewModel` setting. Selected date and view are `rememberSaveable` values inside the tab's `SaveableStateProvider`, surviving tab switches and rotation. `CalendarData` derives per-date occurrences from the shared task, habit, and holiday snapshots: duration tasks span `startDate..endDate` (multi-day timed spans render start/end segments with all-day middles), `dueTime`-only tasks get a default one-hour block, date-only/all-day items and habit check-ins occupy the all-day area, and habits follow the existing `habitsFor` schedule/archive rules with checked-in rows hidden unless Show Completed. Overlapping timed blocks share width through greedy overlap-cluster columns; weeks start on Sunday to match the schedule picker.
+
+Holidays come from the new read-only `HolidayRepository` (`domain/model/Holiday.kt`, in-memory implementation, container wiring). The user skipped the holiday-source question, so the debug seed carries holidays explicitly labeled "(Sample)" under the "Sample holidays" source label rendered in the legend; release seeds an empty, unconfigured source. No real-world holiday dates are claimed and no region is assumed. Task blocks open the shared editor, habit blocks open check-in with the tapped occurrence date, and holiday rows are display-only. Recurrence execution remains deferred, so repeating tasks appear only on their current due date. Validation is compilation and debug APK assembly only (`BUILD SUCCESSFUL in 24s`); runtime and visual checks remain unverified. See [calendar reference notes](references/CALENDAR_REFERENCES.md).
 
 ## 3. Boundaries and dependencies
 
@@ -68,13 +186,13 @@ app/src/main/java/com/niranjan/ticktick/
   feature/
     tasks/                         # Inbox, Today, custom lists, task rows
     taskeditor/                    # Quick Add and full-screen Task Detail
-    planning/                      # Suggested Tasks and Plan Your Day
+    planning/                      # Plan Your Day; Suggested Tasks deferred
     search/
     lists/                         # list management
     tags/
     habits/                        # list, creation, check-in and statistics
     reminders/                     # reminder card and snooze UI
-    calendar/                      # minimal date/agenda screen
+    calendar/                      # List/Day/Week/Month calendar views
     focus/                         # minimal session screen
     settings/
   data/                            # introduced during persistence phase
@@ -221,6 +339,10 @@ Force-stop is distinct from process death or removing the app from recents. Pers
 
 Backup export uses a versioned schema and consistent database snapshot. Restore validates schema, references, and attachment availability before applying a transaction; V1 uses explicit replace-all confirmation and a pre-restore recovery snapshot. Cancel obsolete alarms and reconcile restored reminders after commit. JSON backup includes attachment metadata only; clearly disclose that media bytes need a later ZIP backup. Disable Android cloud backup in production to honor the offline/no-cloud requirement; device transfer policy should be configured deliberately.
 
+## Recurrence backend update — 2026-09-21
+
+B3 adds schema 3 recurrence state/history and shared date generation. Complete/Skip records one outcome and advances the current task atomically; stale revisions cannot act on its replacement. Calendar projects due-date/specific-date futures and completed history without creating editable database tasks. Completion-based rules expose only their current occurrence. Original anchors survive month/year clamping and reminder-only edits. See the [backend plan](BACKEND_IMPLEMENTATION_PLAN.md) for exact policies, evidence and pending runtime acceptance. Earlier deferred-recurrence statements are superseded.
+
 ## 11. Delivery gates
 
 1. **Interactive UI complete:** every agreed V1 surface and transition works with shared demo data; all relevant empty/error/permission states can be inspected; keyboard, Back, rotation, and navigation pass the UI checklist. Screenshot fidelity is a separate pending check if references are absent.
@@ -229,3 +351,7 @@ Backup export uses a versioned schema and consistent database snapshot. Restore 
 4. **V1 complete:** all completion criteria in the product brief pass, including habit recurrence/streak correctness and reference matching. A successful UI demo does not satisfy this gate.
 
 The first work after the UI gate is the minimal durable task/reminder slice on a physical device. Validate the highest-risk platform behavior before expanding the remaining production integrations.
+
+## Backend reminder implementation — 2026-09-18
+
+B2 now implements schema 2 reminder deliveries, transactional reconciliation markers, persisted alert pause/resume, AlarmManager and notification adapters, shared actions and WorkManager recovery. This supersedes the earlier deferred-reminder status; recurring occurrence advancement remains B3. Constant reminders allow four follow-ups at 15-minute intervals; late recovery is silent and consolidated. See [backend plan](BACKEND_IMPLEMENTATION_PLAN.md) for exact behavior and evidence. Runtime/device acceptance remains pending under build-only verification.

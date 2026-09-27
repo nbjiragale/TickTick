@@ -26,7 +26,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -55,9 +62,11 @@ fun NavigationDrawer(
     onSearch: () -> Unit,
     onNotifications: () -> Unit,
     onSettings: () -> Unit,
-    onAddList: () -> Unit,
-    onManageLists: () -> Unit,
+    onAdd: (String) -> Unit,
+    onTag: (String) -> Unit,
+    onFilter: (String) -> Unit,
 ) {
+    var showAddMenu by remember { mutableStateOf(false) }
     ModalDrawerSheet(
         modifier = Modifier.width(width).fillMaxHeight(),
         drawerShape = RectangleShape,
@@ -107,7 +116,21 @@ fun NavigationDrawer(
                             ListSymbol.Welcome -> Color(0xFFE0B132)
                             ListSymbol.Custom -> TickTickColors.DueTime
                         }
-                        DrawerRow(list.name, state.listCount(list.id), symbol, tint, { onList(list.id) }, emoji = if (list.symbol == ListSymbol.Welcome) "👋" else null)
+                        DrawerRow(list.name, state.listCount(list.id), symbol, list.color?.let { Color(it) } ?: tint, { onList(list.id) }, emoji = if (list.symbol == ListSymbol.Welcome) "👋" else null)
+                    }
+                    if (state.snapshot.filters.isNotEmpty()) {
+                        item { Text("Filters", Modifier.padding(start = 28.dp, top = 18.dp, bottom = 4.dp), color = TickTickColors.SecondaryText, style = MaterialTheme.typography.bodySmall) }
+                        items(state.snapshot.filters, key = { "filter:${it.id}" }) { filter ->
+                            DrawerRow(filter.name, state.snapshot.tasks.count { it.isActive && filter.matches(it, state.today) }, AppSymbol.Filter,
+                                TickTickColors.DueTime, { onFilter(filter.id) })
+                        }
+                    }
+                    if (state.snapshot.knownTags.isNotEmpty()) {
+                        item { Text("Tags", Modifier.padding(start = 28.dp, top = 18.dp, bottom = 4.dp), color = TickTickColors.SecondaryText, style = MaterialTheme.typography.bodySmall) }
+                        items(state.snapshot.knownTags, key = { "tag:${it.name}" }) { tag ->
+                            DrawerRow(tag.name, state.snapshot.tasks.count { task -> task.isActive && task.tags.any { it.equals(tag.name, true) } },
+                                AppSymbol.Tag, tag.color?.let { Color(it) } ?: TickTickColors.DueTime, { onTag(tag.name) })
+                        }
                     }
                 }
                 Row(
@@ -115,13 +138,19 @@ fun NavigationDrawer(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Row(Modifier.weight(1f).height(48.dp).clickable(role = Role.Button, onClick = onAddList), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                    Row(Modifier.fillMaxWidth().height(48.dp).clickable(role = Role.Button, onClick = { showAddMenu = true }), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) { AppIcon(AppSymbol.AddList, Modifier.size(21.dp), Color(0xFF55575A)) }
                         Spacer(Modifier.width(8.dp))
                         Text("Add", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                     }
-                    IconButton(onClick = onManageLists, modifier = Modifier.size(40.dp).semantics { contentDescription = "Manage lists" }) {
-                        AppIcon(AppSymbol.Manage, Modifier.size(23.dp), Color(0xFF55575A))
+                    DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }, modifier = Modifier.width(156.dp),
+                        shape = RoundedCornerShape(16.dp), containerColor = Color.White) {
+                        listOf(Triple("List", AppSymbol.Menu, "addList"), Triple("Filter", AppSymbol.Filter, "addFilter"), Triple("Tag", AppSymbol.Tag, "addTag")).forEach { (label, icon, route) ->
+                            DropdownMenuItem(modifier = Modifier.height(40.dp), text = { Text(label, style = MaterialTheme.typography.bodyLarge) }, leadingIcon = { AppIcon(icon, Modifier.size(20.dp)) },
+                                onClick = { showAddMenu = false; onAdd(route) })
+                        }
+                    }
                     }
                 }
             }
