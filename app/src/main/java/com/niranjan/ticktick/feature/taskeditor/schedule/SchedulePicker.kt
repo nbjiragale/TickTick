@@ -100,7 +100,7 @@ internal fun SchedulePicker(initial: TaskSchedule, clock: Clock, onCancel: () ->
                             durationMode = index == 1
                             if (durationMode && range == null) {
                                 val date = draft.date ?: today
-                                val start = draft.time ?: LocalTime.of(10, 0)
+                                val start = draft.time ?: LocalTime.now(clock)
                                 val end = date.atTime(start).plusHours(1)
                                 range = TaskDuration(date, end.toLocalDate(), start, end.toLocalTime())
                             }
@@ -141,7 +141,7 @@ internal fun SchedulePicker(initial: TaskSchedule, clock: Clock, onCancel: () ->
             ScheduleOverlay.Time, ScheduleOverlay.StartTime, ScheduleOverlay.EndTime -> {
                 val which = overlay
                 val time = when (which) { ScheduleOverlay.StartTime -> range?.startTime; ScheduleOverlay.EndTime -> range?.endTime; else -> draft.time }
-                key(which) { ReferenceTimePicker(time ?: LocalTime.of(10, 0), { overlay = null }, { picked ->
+                key(which) { ReferenceTimePicker(time ?: LocalTime.now(clock), { overlay = null }, { picked ->
                     when (which) {
                         ScheduleOverlay.StartTime -> { range = range!!.copy(startTime = picked); overlay = ScheduleOverlay.EndTime }
                         ScheduleOverlay.EndTime -> { range = range!!.copy(endTime = picked); overlay = null }

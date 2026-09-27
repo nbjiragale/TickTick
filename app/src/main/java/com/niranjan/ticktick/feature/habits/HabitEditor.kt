@@ -245,7 +245,7 @@ internal fun HabitEditor(initial: Habit?, today: LocalDate, sections: List<Strin
     }
     if (panel?.startsWith("time:") == true) {
         val original = panel?.substringAfter(':')?.toIntOrNull()?.let { LocalTime.ofSecondOfDay(it.toLong()) }
-        ReferenceTimePicker(original ?: LocalTime.of(9, 0), { panel = null }, { time ->
+        ReferenceTimePicker(original ?: LocalTime.now(), { panel = null }, { time ->
             draft = draft.copy(reminders = (draft.reminders.filter { it != original } + time).distinct().sorted()); panel = null
         }, onClear = original?.let { time -> {
             val remaining = draft.reminders - time
