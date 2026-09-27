@@ -4,17 +4,17 @@ Created: 2026-09-16. Scope: the offline Android backend in this repository.
 
 ## Session checkpoint
 
-**Current state (2026-09-27):** B1-B5 remain implemented. A second B2/B4 popup repair adds Android 15/16 full-screen PendingIntent creator opt-in, lets Android decide full-screen vs heads-up presentation instead of omitting the intent based on an early lock-state snapshot, declares lock-screen/wake attributes at launch, and restores queued incoming requests across activity recreation. Settings now identifies popup-channel, Do Not Disturb and pause blockers. The four sound preferences and schema 5 remain intact. The user's exact device failure has not been reproduced; device popup/audio behavior and earlier runtime acceptance remain unverified.
+**Current state (2026-09-27):** The user reports that popup delivery is working properly on their device after the B2/B4 repair. Detailed device/OS/action-matrix evidence remains unrecorded. B6 now copies new attachments into app-private storage and uses saved task/draft URI references for launch-time orphan cleanup. Its debug build passed; device acceptance remains pending. B1-B5 remain implemented with broader validation pending. Schema remains 5.
 
-**Next action:** install `app/build/outputs/apk/debug/app-debug.apk` for user device acceptance. In reminder settings check the bell pause, notification/exact-alarm access, both channels and popup special access. Create a new real task reminder a few minutes ahead and verify foreground, unlocked background and locked/screen-off delivery, followed by task actions, simultaneous task/habit reminders and recreation. Capture Android/device details and delivery logs if failure persists. Keep four-sound acceptance pending; resume B6 only after these requested corrections are accepted.
+**Next action:** install the B6 debug APK and verify an imported image, audio file and document after restart. Check failed imports, cancelled drafts, Duplicate, Delete/Undo and eventual orphan cleanup on a device. Record the user's popup device/OS details and the still-pending sound/action matrix separately. After B6 device acceptance, begin B7 Focus persistence.
 
-**Current milestone:** B2/B4 popup delivery repair implemented; debug assembly passed and runtime validation pending. B0 complete; B1-B5 implemented with validation pending; B6-B9 not started.
+**Current milestone:** B6 attachment ownership and recovery implemented; debug assembly passed and runtime validation pending. B0 complete; B1-B5 implemented with validation pending; B7-B9 not started.
 
 **Blockers:** no implementation blocker. Android channel overrides, phone volume, silent mode, Do Not Disturb and popup access remain authoritative. The agent's build-only verification boundary remains in effect.
 
 **Working tree:** substantial pre-existing UI/source/reference changes are the baseline. Do not reset, clean, or overwrite them.
 
-**Validation this session:** JDK 17 debug assembly passed in 3m 7s (9 executed, 29 up-to-date), with no Kotlin warnings. Command: `:app:assembleDebug -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain` (both dotted property arguments quoted in PowerShell). Merged manifest confirms the non-exported popup activity and both lock-screen/wake attributes. Seven-file UTF-8/whitespace checks and `git diff --check` passed. APK: `app/build/outputs/apk/debug/app-debug.apk`; log: `build/popup-repair-build-final.log`. Initial invocation failed before compilation due to PowerShell argument splitting; no source failure. No unit/instrumentation/emulator/device tests were run.
+**Validation this session:** B6 JDK 17 debug assembly passed in 2m 20s (5 executed, 33 up-to-date), with no Kotlin warnings. Command: `:app:assembleDebug -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain`. APK: `app/build/outputs/apk/debug/app-debug.apk`; log: `build/attachment-b6-build.log`. No unit, instrumentation, emulator or device tests were run under the current build-only restriction. The user reports popup behavior works on their device.
 
 **Scope decisions:** the user authorized implementation after the planning request. Use the existing offline/local product architecture. No server, account system, cloud sync, subscriptions, or network API is needed for V1. Backend implementation proceeds ahead of unfinished UI acceptance; it does not mark the UI gate complete.
 
@@ -98,7 +98,7 @@ Statuses: **Not started**, **In progress**, **Implemented; validation pending**,
 | B3 | Recurrence and occurrence actions | B1, B2 | Implemented; validation pending |
 | B4 | Habit persistence, rules and reminders | B1-B3 | Implemented, including September 27 popup repair; validation pending |
 | B5 | Durable preferences, drafts and remaining view integration | B1; B3/B4 for occurrences | Implemented, including four sound preferences; validation pending |
-| B6 | Attachment ownership and recovery | B1, B5 | Not started |
+| B6 | Attachment ownership and recovery | B1, B5 | Implemented; validation pending |
 | B7 | Durable Focus sessions and completion | B1, B2, B5 | Not started |
 | B8 | Local export/restore and maintenance | B3-B7 | Not started |
 | B9 | Production wiring and reliability acceptance | B1-B8 | Not started |
@@ -227,12 +227,19 @@ Weekly periods start Monday; partial weeks require at most their unarchived elig
 
 ### B6 — Attachments
 
-- [ ] Retain durable URI access where possible; otherwise copy to app-private storage with temporary files and commit ownership after a successful import.
-- [ ] Handle interrupted imports, unreadable/deleted providers, storage exhaustion and cancelled drafts without saving broken references as successful imports.
-- [ ] Track shared ownership for Duplicate and Undo; delayed orphan cleanup must not delete another task's attachment. Restrict FileProvider paths and URI grants.
-- [ ] Keep recording/scanning expansion outside this slice unless separately requested; persist current supported imports first.
+- [x] Copy new imports to private storage through temporary files; return a task attachment only after a successful copy and rename. Existing persisted external URI grants remain readable for earlier records.
+- [x] Failed/interrupted provider reads and storage writes do not add attachment metadata; cancelled drafts leave only recoverable orphan files for delayed cleanup.
+- [x] Derive shared ownership from saved task and draft URI references so Duplicate and Undo cannot delete another task's file. Clean old unreferenced files after the next process launch; keep the FileProvider confined to private attachments paths and temporary read grants.
+- [x] Keep recording/scanning expansion outside this slice; persist current supported imports first.
 
 **Acceptance:** image/file/audio attachments remain accessible after restart; failure is recoverable; duplicate/delete/Undo preserve valid media; unreferenced temporary files are eventually cleaned safely.
+
+#### B6 implementation notes — 2026-09-27
+
+- `platform/attachments/ManagedAttachmentStore.kt` copies all new picker/camera imports to private `files/attachments/owned/` using a staging file and rename; the editor sees only a completed `FileProvider` URI. Camera destinations are private temporary files. Failed/cancelled imports leave no saved reference, and an interrupted draft already surfaces a recovery message.
+- Existing Room `task_attachments` rows and versioned task draft metadata act as the owner set. A new database table or schema migration is not needed. On launch, `AppContainer` waits for both stores to be Ready before deleting owned/staging/capture files older than 24 hours with no task or parseable draft reference. A malformed draft stops cleanup conservatively. Launch-only cleanup avoids the live one-session Undo window, and deletion is limited to files inside the private attachments directory. Previously saved external provider URIs are unchanged.
+- `AttachmentActions.kt` now copies document-picker results immediately and removes a temporary camera destination only after the private copy succeeds. The menu, cards and viewer behavior stay the same. No microphone/recording/scanning expansion or new storage permission.
+- **Validation:** JDK 17 debug APK assembly passed in 2m 20s (5 executed, 33 up-to-date), with no Kotlin warnings. APK: `app/build/outputs/apk/debug/app-debug.apk`; log: `build/attachment-b6-build.log`. No runtime, device, emulator, unit or instrumentation checks under the build-only boundary. Restart access, provider revocation, interrupted writes, full storage, orphan cleanup, Duplicate and Undo need device acceptance.
 
 ### B7 — Focus persistence
 
@@ -364,5 +371,7 @@ Known prior build recipe (recheck local JDK 17 configuration when needed):
 | 2026-09-25 | B2/B4/B5 addition: four saved Android sound-picker choices, commit-based completion feedback and separate notification/popup audio | Final debug build passed (1m 3s, no Kotlin warnings); 18-file UTF-8/whitespace and git checks passed. User device/audio acceptance is next. |
 
 | 2026-09-27 | B2/B4 repair: modern full-screen launch opt-in, presentation-time routing, launch attributes, request restoration and settings blockers | Debug APK assembly passed (3m 7s, no Kotlin warnings); merged manifest and seven-file source checks passed. Exact phone failure not reproduced; user device acceptance remains next. |
+
+| 2026-09-27 | B6: private attachment copies, reference-based shared ownership and delayed launch-time orphan cleanup | JDK 17 debug APK assembly passed (2m 20s, no Kotlin warnings). The user reports popup delivery works. Attachment device acceptance remains pending; next B7 after that gate. |
 
 For subsequent entries record: milestone/slice, changed paths, decisions, exact checks and outcomes, unresolved risks, and next action. Keep the checkpoint at the top current so a new session does not need to reconstruct the history.

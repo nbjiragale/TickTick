@@ -14,6 +14,11 @@ import java.time.Clock
 import com.niranjan.ticktick.core.time.DeviceClock
 import com.niranjan.ticktick.domain.repository.ReminderRepository
 import com.niranjan.ticktick.platform.reminders.ReminderController
+import com.niranjan.ticktick.platform.attachments.ManagedAttachmentStore
+import com.niranjan.ticktick.domain.repository.TaskStoreState
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class AppContainer(application: Application) {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -30,6 +35,17 @@ class AppContainer(application: Application) {
     init {
         taskStore.onReminderChange = { reminderController.requestReconcile() }
         taskStore.onCompletion = sounds::play
+        applicationScope.launch {
+            combine(taskRepository.storeState, uiStateRepository.storeState) { tasks, drafts ->
+                tasks == TaskStoreState.Ready && drafts == TaskStoreState.Ready
+            }.first { it }
+            runCatching {
+                ManagedAttachmentStore(application).cleanOldOrphans(
+                    taskRepository.snapshot.value.tasks.flatMap { task -> task.attachments.map { it.uri } },
+                    uiStateRepository.currentDraft("task")?.payload,
+                )
+            }
+        }
     }
     val holidayRepository: HolidayRepository = InMemoryHolidayRepository(initialHolidaySnapshot(clock))
 }

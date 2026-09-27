@@ -1,5 +1,15 @@
 # Attachment menu and task cards
 
+## Durable import and ownership — 2026-09-27
+
+New photo, image, audio and file selections are copied into private `files/attachments/owned/` storage before their metadata is added to an editor draft. The copy uses a staging file and is renamed only after the bytes are written; inaccessible providers, interrupted imports and full storage leave no successful attachment record. Captured photos first use `files/attachments/capture/` and the temporary capture is removed after its private copy succeeds. An interrupted capture/import is eligible for later cleanup.
+
+The September 6 implementation notes below describe the earlier UI-only state. Their session-only storage and deferred-copy statements are superseded by Room and this B6 implementation.
+
+Saved tasks and the recoverable task draft own files by URI. Duplicate can share a file without another copy; removing one association does not remove another task's media. A launch-time cleanup, after both stores load, removes files older than 24 hours only if neither saved tasks nor the saved draft references them. Cleanup also covers old camera destinations under `files/attachments/`; it leaves all files untouched if the saved draft cannot be parsed. It runs on a later process launch so the prior session's Delete Undo window has ended. The FileProvider remains limited to the private attachments directory for compatibility with existing captured-photo URIs. No new media permission or database migration is needed. Previously saved external document URIs retain their existing persisted grant; new imports no longer rely on provider access after the copy.
+
+Source and build verification do not establish real-device persistence or camera/provider behavior. Reopen imported image/file/audio after restart, try a revoked or deleted source, and check Duplicate, Delete and Undo on a device before marking B6 verified.
+
 Implemented 2026-09-06 from [attachment-menu.jpg](attachment-menu.jpg), copied without alteration from `photo_2026-09-06_10-39-34.jpg` (576 × 1280). The user confirmed that added images/files should appear inside the task and that delete is sufficient for attachment actions. The reference app's premium restriction prevented an added-attachment screenshot; it is not a requirement for this app. No premium checks, quotas, subscriptions, or accounts were added.
 
 ## Reference menu
