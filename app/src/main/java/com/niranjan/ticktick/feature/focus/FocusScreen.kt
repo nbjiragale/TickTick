@@ -45,26 +45,30 @@ import com.niranjan.ticktick.core.designsystem.AppIcon
 import com.niranjan.ticktick.core.designsystem.AppSymbol
 import com.niranjan.ticktick.domain.model.Task
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 val FocusBackground = Color(0xFFF3F3F9)
 private val FocusBlue = Color(0xFF3975FF)
 private val FocusMuted = Color(0xFFAAABB0)
 
 @Composable
-fun FocusScreen(state: FocusUiState, vm: FocusViewModel, tasks: List<Task>) {
+fun FocusScreen(state: FocusUiState, vm: FocusViewModel, tasks: List<Task>, deliveryError: String? = null, onRetryDelivery: () -> Unit = {}) {
     val session = state.session
     var panel by rememberSaveable { mutableStateOf<String?>(null) }
-    var soundUri by rememberSaveable { mutableStateOf<String?>(null) }
+    val soundUri = session.soundUri
+    val writeError by vm.writeError.collectAsState()
+    val busy by vm.busy.collectAsState()
+    val history by vm.history.collectAsState()
     var soundError by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) runCatching {
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            soundUri = uri.toString(); soundError = null
+            vm.sound(uri.toString()); soundError = null
         }.onFailure { soundError = "This audio file couldn't be opened. Choose another file."; panel = "sound" }
     }
     TimerDeviceEffects(session.keepScreenOn, soundUri, session.phase == FocusPhase.Running) {
-        soundError = "This audio file couldn't be played. Choose another file."; soundUri = null; panel = "sound"
+        soundError = "This audio file couldn't be played. Choose another file."; vm.sound(null); panel = "sound"
     }
     BackHandler(session.expanded && panel == null) { vm.expand(false) }
     val active = session.phase != FocusPhase.Ready
@@ -148,7 +152,7 @@ fun FocusScreen(state: FocusUiState, vm: FocusViewModel, tasks: List<Task>) {
                 Box(Modifier.align(Alignment.TopCenter).offset(y = layoutHeight * .8f - 32.dp).height(64.dp), contentAlignment = Alignment.Center) {
                     AnimatedContent(active, label = "Timer controls") { showControls ->
                         if (!showControls || session.phase == FocusPhase.Finished) {
-                            Button(onClick = vm::start, modifier = Modifier.width(164.dp).height(48.dp), shape = CircleShape,
+                            Button(onClick = vm::start, enabled = !busy, modifier = Modifier.width(164.dp).height(48.dp), shape = CircleShape,
                                 colors = ButtonDefaults.buttonColors(containerColor = FocusBlue)) { Text(if (session.phase == FocusPhase.Finished) "Start Again" else "Start", fontSize = 16.sp) }
                         } else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                             RoundControl(AppSymbol.Music, "Focus sound", 50, false, soundUri != null) { panel = "sound" }
@@ -167,6 +171,12 @@ fun FocusScreen(state: FocusUiState, vm: FocusViewModel, tasks: List<Task>) {
             }
         }
     }
+    var deliveryErrorHidden by remember(deliveryError) { mutableStateOf(false) }
+    if (deliveryError != null && !deliveryErrorHidden) AlertDialog(onDismissRequest = { deliveryErrorHidden = true },
+        text = { Text(deliveryError) }, confirmButton = { TextButton(onClick = onRetryDelivery) { Text("Retry") } },
+        dismissButton = { TextButton(onClick = { deliveryErrorHidden = true }) { Text("Close") } })
+    writeError?.let { message -> AlertDialog(onDismissRequest = vm::clearError,
+        text = { Text(message) }, confirmButton = { TextButton(onClick = vm::clearError) { Text("OK") } }) }
     when (panel) {
         "stop" -> AlertDialog(onDismissRequest = { panel = null }, title = { Text("Stop focus?") },
             text = { Text(if (session.mode == FocusMode.Stopwatch) "Save this session and reset the stopwatch?" else "End this session and reset the timer?") },
@@ -174,14 +184,20 @@ fun FocusScreen(state: FocusUiState, vm: FocusViewModel, tasks: List<Task>) {
             dismissButton = { TextButton(onClick = { panel = null }) { Text("Cancel") } })
         "duration" -> FocusInput("Focus duration", session.durationMinutes.toString(), true, { panel = null }) {
             val minutes = it.toIntOrNull()
-            if (minutes == null || minutes !in 1..180) "Enter 1 to 180 minutes." else { vm.duration(minutes); panel = null; null }
+            if (minutes == null || minutes !in 1..180) "Enter 1 to 180 minutes." else vm.saveDuration(minutes).also { error -> if (error == null) panel = null }
         }
-        "note" -> FocusInput("Focus note", session.note, false, { panel = null }) { vm.note(it.trim()); panel = null; null }
+        "note" -> FocusInput("Focus note", session.note, false, { panel = null }) { vm.saveNote(it.trim()).also { error -> if (error == null) panel = null } }
         "stats" -> AlertDialog(onDismissRequest = { panel = null }, title = { Text("Focus statistics") },
             text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("${session.completedSessions} completed sessions")
                 Text("${session.completedFocusMs / 60_000} minutes focused")
-                Text("This app session", color = FocusMuted)
+                Text("All saved sessions", color = FocusMuted)
+                Column(Modifier.heightIn(max = 250.dp).verticalScroll(rememberScrollState())) {
+                    history.take(50).forEach { record ->
+                        Text("${java.time.Instant.ofEpochMilli(record.endedAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()} · ${record.elapsedMs / 60_000} min · ${if (record.completed) "Completed" else "Stopped"}")
+                        if (record.note.isNotBlank()) Text(record.note, color = FocusMuted)
+                    }
+                }
             } }, confirmButton = { TextButton(onClick = { panel = null }) { Text("Done") } })
         "focus" -> AlertDialog(onDismissRequest = { panel = null }, title = { Text("Focus on") }, text = {
             Column(Modifier.heightIn(max = 350.dp).verticalScroll(rememberScrollState())) {
@@ -195,7 +211,7 @@ fun FocusScreen(state: FocusUiState, vm: FocusViewModel, tasks: List<Task>) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(if (soundUri == null) "Silent" else "Audio file selected")
                 soundError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                TextButton(onClick = { soundUri = null; soundError = null; panel = null }) { Text("Silent") }
+                TextButton(onClick = { vm.sound(null); soundError = null; panel = null }) { Text("Silent") }
                 TextButton(onClick = { panel = null; picker.launch(arrayOf("audio/*")) }) { Text("Choose audio file") }
             }
         }, confirmButton = { TextButton(onClick = { panel = null }) { Text("Done") } })
@@ -219,15 +235,17 @@ private fun RoundControl(symbol: AppSymbol, label: String, size: Int, primary: B
 }
 
 @Composable
-private fun FocusInput(title: String, initial: String, numeric: Boolean, onDismiss: () -> Unit, onSave: (String) -> String?) {
+private fun FocusInput(title: String, initial: String, numeric: Boolean, onDismiss: () -> Unit, onSave: suspend (String) -> String?) {
     var value by rememberSaveable { mutableStateOf(initial) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, text = {
+    var saving by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    AlertDialog(onDismissRequest = { if (!saving) onDismiss() }, title = { Text(title) }, text = {
         OutlinedTextField(value, { value = if (numeric) it.filter(Char::isDigit).take(3) else it; error = null },
             label = { Text(if (numeric) "Minutes" else "Note") }, keyboardOptions = KeyboardOptions(keyboardType = if (numeric) KeyboardType.Number else KeyboardType.Text),
-            singleLine = numeric, maxLines = if (numeric) 1 else 6, isError = error != null, supportingText = { error?.let { Text(it) } })
-    }, confirmButton = { TextButton(onClick = { error = onSave(value) }) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
+            enabled = !saving, singleLine = numeric, maxLines = if (numeric) 1 else 6, isError = error != null, supportingText = { error?.let { Text(it) } })
+    }, confirmButton = { TextButton(enabled = !saving, onClick = { saving = true; scope.launch { try { error = onSave(value) } finally { saving = false } } }) { Text("Save") } },
+        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("Cancel") } })
 }
 
 @Composable

@@ -4,17 +4,17 @@ Created: 2026-09-16. Scope: the offline Android backend in this repository.
 
 ## Session checkpoint
 
-**Current state (2026-09-27):** The user reports that popup delivery is working properly on their device after the B2/B4 repair. Detailed device/OS/action-matrix evidence remains unrecorded. B6 now copies new attachments into app-private storage and uses saved task/draft URI references for launch-time orphan cleanup. Its debug build passed; device acceptance remains pending. B1-B5 remain implemented with broader validation pending. Schema remains 5.
+**Current state (2026-10-13):** Existing-feature correctness review complete at source level; five defects corrected without adding features. Fixes cover stale destinations, tag/list-token corruption, backup limits, attachment cleanup races and planning save races. B1–B9 remain implemented with device acceptance pending; schema remains 6. See `EXISTING_FEATURE_REVIEW.md` for full coverage and findings.
 
-**Next action:** install the B6 debug APK and verify an imported image, audio file and document after restart. Check failed imports, cancelled drafts, Duplicate, Delete/Undo and eventual orphan cleanup on a device. Record the user's popup device/OS details and the still-pending sound/action matrix separately. After B6 device acceptance, begin B7 Focus persistence.
+**Next action:** review the fixes in [draft PR #1](https://github.com/nbjiragale/TickTick/pull/1). The remaining priority is device acceptance of existing behavior: multiple-time reminders, restart/restore recovery, attachment Delete/Undo and rapid edits/actions. No new feature development is proposed. The build-only restriction remains in effect.
 
-**Current milestone:** B6 attachment ownership and recovery implemented; debug assembly passed and runtime validation pending. B0 complete; B1-B5 implemented with validation pending; B7-B9 not started.
+**Current milestone:** B9 production wiring implemented; debug/release builds and CI passed, device acceptance pending. Existing explicit feature exclusions remain unchanged.
 
-**Blockers:** no implementation blocker. Android channel overrides, phone volume, silent mode, Do Not Disturb and popup access remain authoritative. The agent's build-only verification boundary remains in effect.
+**Blockers:** no implementation blocker. Android notification/channel/DND settings remain authoritative. The build-only verification restriction remains active.
 
-**Working tree:** substantial pre-existing UI/source/reference changes are the baseline. Do not reset, clean, or overwrite them.
+**Latest validation:** existing-feature review fixes passed JDK 21 debug/release assembly and release lint-vital checks in 3m 52s (16 executed, 72 up-to-date). Command: `:app:assembleDebug :app:assembleRelease -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain`. Log: `build/existing-features-review-build.log` (local, ignored). No Kotlin warnings; one non-fatal lint analytics warning concerns the sandbox's unwritable home directory. `git diff --check` passed. No unit, instrumentation, emulator or device tests ran; source/build verification is not runtime acceptance.
 
-**Validation this session:** B6 JDK 17 debug assembly passed in 2m 20s (5 executed, 33 up-to-date), with no Kotlin warnings. Command: `:app:assembleDebug -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain`. APK: `app/build/outputs/apk/debug/app-debug.apk`; log: `build/attachment-b6-build.log`. No unit, instrumentation, emulator or device tests were run under the current build-only restriction. The user reports popup behavior works on their device.
+**Previous validation:** final source commit `6db870c` passed JDK 21 `:app:assembleDebug :app:assembleRelease -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain` in 6m 18s (55 executed, 33 up-to-date), including release lint-vital checks. Log: `build/offline-completion-build.log` (local, ignored). APKs: `app/build/outputs/apk/debug/app-debug.apk` and `app/build/outputs/apk/release/app-release-unsigned.apk`. No Kotlin warnings; one non-fatal lint analytics warning concerned the sandbox's unwritable home directory. [GitHub CI passed and uploaded APKs](https://github.com/nbjiragale/TickTick/actions/runs/38350214840). Static schema comparison preserved all 22 schema-5 tables and matched both new migration CREATE statements to Room's export. No unit, instrumentation, emulator or device tests ran. The earlier user's popup success report remains distinct from the pending broader acceptance matrix. No merge or release publication performed.
 
 **Scope decisions:** the user authorized implementation after the planning request. Use the existing offline/local product architecture. No server, account system, cloud sync, subscriptions, or network API is needed for V1. Backend implementation proceeds ahead of unfinished UI acceptance; it does not mark the UI gate complete.
 
@@ -99,9 +99,9 @@ Statuses: **Not started**, **In progress**, **Implemented; validation pending**,
 | B4 | Habit persistence, rules and reminders | B1-B3 | Implemented, including September 27 popup repair; validation pending |
 | B5 | Durable preferences, drafts and remaining view integration | B1; B3/B4 for occurrences | Implemented, including four sound preferences; validation pending |
 | B6 | Attachment ownership and recovery | B1, B5 | Implemented; validation pending |
-| B7 | Durable Focus sessions and completion | B1, B2, B5 | Not started |
-| B8 | Local export/restore and maintenance | B3-B7 | Not started |
-| B9 | Production wiring and reliability acceptance | B1-B8 | Not started |
+| B7 | Durable Focus sessions and completion | B1, B2, B5 | Implemented; validation pending |
+| B8 | Local export/restore and maintenance | B3-B7 | Implemented; validation pending |
+| B9 | Production wiring and reliability acceptance | B1-B8 | Implemented; validation pending |
 
 ### B1 — Room foundation and durable tasks
 
@@ -243,26 +243,26 @@ Weekly periods start Monday; partial weeks require at most their unarchived elig
 
 ### B7 — Focus persistence
 
-- [ ] Introduce a Focus repository for session configuration, notes, task association and history. Preserve current Pomo/Stopwatch counting and foreground-only sound/screen-on behavior.
-- [ ] Persist elapsed baselines and a reboot-aware recovery policy; never compare an old boot's elapsedRealtime value with a new boot's counter.
-- [ ] Schedule completion through a suitable supported Android adapter, cancel/update on pause/stop, and record completion once even if UI and alarm race.
-- [ ] Derive statistics from history; task deletion must not corrupt historical focus records. Background audio/service expansion is a separate product decision.
+- [x] Introduce a Focus repository for session configuration, notes, task association and history. Preserve current Pomo/Stopwatch counting and foreground-only sound/screen-on behavior.
+- [x] Persist elapsed baselines and a reboot-aware recovery policy; never compare an old boot's elapsedRealtime value with a new boot's counter.
+- [x] Schedule completion through a suitable supported Android adapter, cancel/update on pause/stop, and record completion once even if UI and alarm race.
+- [x] Derive statistics from history; task deletion must not corrupt historical focus records. Background audio/service expansion is a separate product decision.
 
 **Acceptance:** rotation, tab switches, process recreation, pause/resume, stop and reboot follow documented semantics; completion is counted once; existing notes/history survive restart. Sound and screen-on remain device-verification items.
 
 ### B8 — Backup, restore and maintenance
 
-- [ ] Export a versioned JSON snapshot via user-selected local storage, including durable records/settings/history. Document that V1 JSON includes attachment metadata, not media bytes.
-- [ ] Validate schema version, field values, IDs/references, sizes and file availability before restore; reject unsupported newer formats without changing current data.
-- [ ] Implement deliberate replace-all restore with an in-app confirmation and pre-restore recovery snapshot. Apply database changes transactionally, then invalidate old alarms and reconcile restored state.
-- [ ] Use WorkManager only for deferrable cleanup/reconciliation/backup maintenance. Honor offline-only scope in manifest cloud-backup and extraction rules; decide device-transfer behavior explicitly.
+- [x] Export a versioned JSON snapshot via user-selected local storage, including durable records/settings/history. Document that V1 JSON includes attachment metadata, not media bytes.
+- [x] Validate schema version, field values, IDs/references, sizes and file availability before restore; reject unsupported newer formats without changing current data.
+- [x] Implement deliberate replace-all restore with an in-app confirmation and pre-restore recovery snapshot. Apply database changes transactionally, then invalidate old alarms and reconcile restored state.
+- [x] Use WorkManager only for deferrable cleanup/reconciliation/backup maintenance. Honor offline-only scope in manifest cloud-backup and extraction rules; decide device-transfer behavior explicitly.
 
 **Acceptance:** round trip retains IDs, schedules, history and preferences; malformed/interrupted restore leaves prior data usable; missing media is disclosed; cancelled restore has no side effects; restored alarms do not duplicate old deliveries.
 
 ### B9 — Production completion
 
-- [ ] Verify production AppContainer uses durable task/habit/focus/settings/draft stores and real adapters; keep simulator controls and sample seeding isolated from release.
-- [ ] Complete migrations, error/loading/retry handling and safe diagnostics without logging private titles, notes or media.
+- [x] Verify production AppContainer uses durable task/habit/focus/settings/draft stores and real adapters; keep simulator controls and sample seeding isolated from release.
+- [x] Complete migrations, error/loading/retry handling and safe diagnostics without logging private titles, notes or media.
 - [ ] Complete the validation matrix below and record device/OS/build evidence. Close remaining product decisions and document known platform limits.
 
 **Acceptance:** all approved backend journeys work offline across restart and upgrades, with no known data-loss path; reminder reliability has device evidence; unresolved verification is listed explicitly. UI screenshot acceptance remains separately tracked.
@@ -375,3 +375,51 @@ Known prior build recipe (recheck local JDK 17 configuration when needed):
 | 2026-09-27 | B6: private attachment copies, reference-based shared ownership and delayed launch-time orphan cleanup | JDK 17 debug APK assembly passed (2m 20s, no Kotlin warnings). The user reports popup delivery works. Attachment device acceptance remains pending; next B7 after that gate. |
 
 For subsequent entries record: milestone/slice, changed paths, decisions, exact checks and outcomes, unresolved risks, and next action. Keep the checkpoint at the top current so a new session does not need to reconstruct the history.
+
+### 2026-10-13 resumed implementation — B7 checkpoint
+
+The earlier October 6 workspace was replaced before its uncommitted changes were pushed. The GitHub baseline remains `80c2158`; this branch reconstructs the recorded work, with remote checkpoints after each bounded increment. Previous build results do not validate this reconstructed source.
+
+B7 implementation now includes Room Focus session/history, migration 5→6, boot-count-aware paused recovery, serialized completion and history-derived totals; Android elapsed-realtime completion alarms, notification deep links and worker recovery; durable notes/configuration/audio choice and explicit save errors. Audio/screen-on remain foreground-only. Same-boot process recovery continues elapsed time; reboot pauses at the last durable checkpoint. Debug assembly is in progress. No unit, instrumentation, emulator or device tests have run under the retained build-only boundary.
+
+Next: record B7 build evidence, then reconstruct B8 export/restore and finish the audited local settings/organization gaps. Runtime acceptance remains pending for all backend milestones.
+
+### B8 implementation checkpoint — 2026-10-13
+
+`platform/backup/BackupManager.kt` snapshots all Room tables in a transaction, bounds imports to 32 MiB/100,000 records, validates schema/columns/types/foreign keys and domain values in a separate in-memory database, and previews record counts and unavailable attachments. Restore saves a synced pre-restore JSON copy before atomically replacing rows. Imported running Focus sessions pause, revisions advance, old reminder alarms cancel and current repositories reload. Shared database serialization and a generation guard prevent queued old draft writes from returning after restore. UI displays durable restore outcomes across activity recreation. Recovery-copy attachment references are retained by cleanup. Android auto-backup excludes the database and private files; the app's explicit JSON workflow documents that media bytes/provider grants are excluded.
+
+Changed areas: backup/settings UI, Room repository write coordination/reload, application/activity reset, reminder cancellation, backup XML, Room schema 6 export. Debug assembly passed; runtime rollback, migration, stale-action and document-provider acceptance remain pending.
+
+### Local workflow completion — 2026-10-13
+
+Organization edit/delete now uses the existing task menu and repository transaction boundary. Inbox is protected; list deletion moves tasks and list filter conditions to Inbox; tag rename updates assignments/title tokens/filter conditions; tag deletion keeps unmatched saved filter conditions. A title consisting only of a deleted tag retains plain text without `#`. Undo after list deletion falls back to Inbox. Room removes obsolete organization rows after child links are updated.
+
+Room-backed app preferences now control visible tab order, light-theme accent, calendar week start, time labels, default list and date-only reminder time for new tasks. Existing schedules and habit history rules do not change. Committed habit completion triggers reduced-motion-aware confetti; opening already completed history does not replay it.
+
+Changed areas: domain repository and mutation coordinator, DAO/mapper, organization editors/menu, `core/settings`, settings UI, calendar/schedule/task/reminder time labels and habit completion UI. Debug assembly passed in 1m 37s (7 executed, 31 up-to-date), log `/tmp/settings-build.log`. Device behavior remains unverified. Next: final reliability review and debug/release assembly.
+
+### Reliability follow-up — 2026-10-13
+
+Restore advances saved draft revision baselines together with task/habit revisions, preserving true conflicts without making every restored edit stale. The activity resets even if post-commit reload fails. Filter writes reject removed list conditions. Static schema comparison confirms all 22 schema-5 tables remain unchanged; schema 6 adds only Focus session/history. The first CI run stopped in SDK setup because the action's default `tools` package is retired; the workflow now selects current command-line tools and `platform-tools` explicitly. Final debug/release assembly and rerun CI are in progress.
+
+### Final delivery checkpoint — 2026-10-13
+
+Implemented and pushed: Focus (`92a871b`), backup/restore (`01009c7`), local settings/organization/feedback/build workflow (`c43b025`), and restore/filter/CI reliability fixes (`6db870c`). All implementation changes are reviewable in PR #1. Final local debug/release assembly and CI passed as recorded above. Documentation-only follow-up records this evidence; device/runtime and screenshot acceptance remain pending, with explicit deferred product features listed in the audit.
+
+### Habit multiple-time reminder correction — 2026-10-13
+
+User report: not all selected habit times produce reminders. Static tracing found two suppression paths: `withHabitReminders` excluded an entire completed day, causing pending times to become suppressed; `TickTickApp` held `autoHabitOpen` until the old log closed, while the foreground platform adapter hid notifications for automatic popups. The timing list and per-time PendingIntent identities already retained every selected time.
+
+The implementation now retains later selected times after daily completion, stops only the active repeat cycle on check-in/dismissal, and consumes each new foreground delivery even when an earlier log is open. Actual delivery time is used in notification labels. Completed-day notifications omit quick Check in, and stale Check in actions dismiss without adding quantity. Archive, schedule, pause, missed-alert catch-up and weekly/finite-goal eligibility remain authoritative. No schema migration is required. This supersedes the earlier B4 policy that daily completion cancels the remaining times.
+
+Changed files: `domain/model/HabitReminder.kt`, `data/repository/ReminderStore.kt`, `data/repository/RoomTaskRepository.kt`, `app/TickTickApp.kt`; habit reference/audit/tracker documentation. Pending device checks include dismiss/partial/full check-in at the first of three times, leaving the first log open or switching tabs, background/lock-screen delivery, process restart, constant repeats, stale Check in, archive/Undo and goal boundaries. Build-only validation remains in effect.
+
+**Habit correction build result:** debug and unsigned release APK assembly passed in 3m 31s; `git diff --check` passed. Device validation remains pending.
+
+### Existing-feature correctness review — 2026-10-13
+
+The user redirected work to validating existing features rather than adding features. Reviewed task editing/drafts/NLP/checklists and batch actions, organization/search, recurrence/schedules, calendar projections/actions, Plan Your Day, habits/goals, reminders, Focus, settings/media, and backup/restore. Detailed source coverage, concrete triggers and remaining device cases are recorded in `EXISTING_FEATURE_REVIEW.md`.
+
+Fixed five established source-level issues: stale saved navigation destinations now resolve to the real Inbox; tag edits preserve tag-looking text inside list tokens; backup export/recovery apply restore's record/field/byte limits; startup attachment cleanup finishes before UI Delete/Undo or restore and reads committed ownership under the write lock; planning menu actions cannot persist older review state while a task/checkpoint action commits. Backup validation failures display an actionable explanation. No product feature, schema or dependency added.
+
+Changed implementation: `app/AppContainer.kt`, `app/TickTickApp.kt`, `data/repository/TaskMutation.kt`, `feature/tasks/TasksViewModel.kt`, `feature/planning/PlanYourDayViewModel.kt`, `platform/backup/BackupManager.kt`, `feature/settings/BackupSettings.kt`. Debug/release assembly and release lint-vital checks passed in 3m 52s; no runtime acceptance is claimed.

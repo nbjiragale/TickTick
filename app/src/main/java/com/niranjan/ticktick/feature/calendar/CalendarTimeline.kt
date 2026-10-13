@@ -104,6 +104,7 @@ internal fun CalendarTimeline(
 }
 
 private fun hourLabel(hour: Int): String = when {
+    com.niranjan.ticktick.core.settings.AppDisplay.preferences.use24Hour -> "%02d:00".format(java.util.Locale.ROOT, hour)
     hour == 0 -> "12 AM"
     hour < 12 -> "$hour AM"
     hour == 12 -> "12 PM"

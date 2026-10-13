@@ -1,5 +1,11 @@
 # Habits home and custom creation — 2026-09-07
 
+## Multiple reminder delivery correction — 2026-10-13
+
+Each selected time remains a separate reminder on an eligible habit day, including later times after the daily target is completed. A check-in or dismissal stops the active reminder's Constant Reminder cycle; it does not cancel the other selected times. Archive, unscheduled days and later days retired by a weekly/finite goal still suppress reminders. Already-completed days expose Open/Dismiss instead of another quick Check in, and stale Check in actions do not add quantity. Notification labels show the actual selected time, rather than always the first time in the list.
+
+The foreground automatic-log handler now consumes each new delivery even when an earlier habit log remains open or the user has switched tabs. The old `autoHabitOpen` flag suppressed subsequent openings while the notification adapter also hid foreground popup notifications. This correction supersedes the earlier completion-cancels-delivery wording below. Device acceptance is pending; build evidence is in the backend tracker.
+
 ## Sound settings — 2026-09-25
 
 The main Settings page now exposes Habit completion separately from Notification and Reminder popup. The old habit ringtone row edits the shared Notification choice, avoiding two conflicting selectors; its prior saved tone is the fallback until the new choice is saved. Native Android tone selection includes System default and Silent. Completion audio plays only after committed progress crosses the dated target, including notification check-in; partial progress, Undo and stale/failed actions stay quiet. Foreground automatic habit log opening plays the Popup tone once. Background popup audio comes from its notification channel. Runtime audio, native picker and restart behavior remain unverified; see the [backend plan](../BACKEND_IMPLEMENTATION_PLAN.md).

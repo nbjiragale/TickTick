@@ -92,6 +92,9 @@ internal suspend fun TaskDao.writeChanges(before: TaskSnapshot, after: TaskSnaps
         putChecklist(task.checklist.mapIndexed { index, item -> ChecklistEntity(task.id, item.id, item.text, item.completed, index) })
         putAttachments(task.attachments.mapIndexed { index, item -> AttachmentEntity(task.id, item.id, item.name, item.uri, item.mimeType, item.sizeBytes, index) })
     }
+    deleteTags(before.knownTags.map { it.name.storageKey() } - after.knownTags.map { it.name.storageKey() }.toSet())
+    deleteLists(before.lists.map { it.id } - after.lists.map { it.id }.toSet())
+    deleteFilters(before.filters.map { it.id } - after.filters.map { it.id }.toSet())
     deleteUnusedTags()
     if (before.snoozedUntil != after.snoozedUntil) {
         clearSnoozes()

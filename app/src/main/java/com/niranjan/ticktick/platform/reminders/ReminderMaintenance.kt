@@ -27,11 +27,13 @@ object ReminderMaintenance {
 
 class ReminderWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result = try {
-        val controller = (applicationContext as TickTickApplication).container.reminderController
+        val container = (applicationContext as TickTickApplication).container
+        val controller = container.reminderController
         val action = inputData.getString("action")
         if (action != null) controller.handle(action, inputData.getString("id").orEmpty(),
             inputData.getLong("revision", -1), inputData.getLong("snoozeUntil", 0))
         else controller.reconcile(force = true)
+        container.focusController.reconcile()
         // Missing user permissions are not a transient worker failure. Resume refresh retries them.
         Result.success()
     } catch (cancelled: CancellationException) { throw cancelled }

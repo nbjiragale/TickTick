@@ -34,6 +34,8 @@ import com.niranjan.ticktick.feature.organization.AddFilterScreen
 /** Basic functional dialogs pending the next reference screenshots. */
 @Composable
 fun AppOverlays(
+    uiRepository: com.niranjan.ticktick.domain.repository.UiStateRepository,
+    backupManager: com.niranjan.ticktick.platform.backup.BackupManager,
     sounds: com.niranjan.ticktick.platform.sounds.AppSounds,
     reminderController: com.niranjan.ticktick.platform.reminders.ReminderController,
     overlay: String?,
@@ -58,7 +60,7 @@ fun AppOverlays(
         "search", "reminders" -> {
             var query by rememberSaveable(overlay) { mutableStateOf("") }
             val tasks = when (overlay) {
-                "search" -> state.snapshot.tasks.filter { it.title.contains(query.trim(), ignoreCase = true) }
+                "search" -> state.snapshot.tasks.filter { (it.title.contains(query.trim(), ignoreCase = true) || it.description.contains(query.trim(), ignoreCase = true)) }
                 else -> state.snapshot.tasks.filter { it.isActive && !it.isNote && it.dueDate != null &&
                     (it.dueTime != null || it.hasReminder || it.id in state.snapshot.snoozedUntil) }
             }
@@ -104,8 +106,8 @@ fun AppOverlays(
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     com.niranjan.ticktick.feature.settings.SoundSettings(sounds)
                     com.niranjan.ticktick.feature.reminders.ReminderSettings(reminderController)
-                    Text("Appearance", fontWeight = FontWeight.Medium)
-                    Text("Light", color = TickTickColors.SecondaryText)
+                    com.niranjan.ticktick.feature.settings.BackupSettings(backupManager)
+                    com.niranjan.ticktick.feature.settings.LocalSettings(uiRepository, state.snapshot.lists)
                     TextButton(onClick = viewModel::toggleShowCompleted) { Text(if (state.showCompleted) "Hide completed tasks" else "Show completed tasks") }
                     TextButton(onClick = viewModel::toggleSort) { Text(if (state.sortByTime) "Sort tasks by creation time" else "Sort tasks by due date") }
                 }

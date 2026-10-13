@@ -99,20 +99,39 @@ private enum class AppTab(val label: String, val symbol: AppSymbol) {
 }
 
 @Composable
-fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.platform.reminders.ReminderOpenRequest? = null, onReminderRequestHandled: () -> Unit = {}) {
+fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.platform.reminders.ReminderOpenRequest? = null, openFocus: Boolean = false, onFocusOpened: () -> Unit = {}, onReminderRequestHandled: () -> Unit = {}) {
+    val restoring by container.backupManager.restoring.collectAsStateWithLifecycle()
+    if (restoring) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                androidx.compose.material3.CircularProgressIndicator()
+                Text("Restoring saved data…")
+            }
+        }
+        return
+    }
+    val restoreOutcome by container.backupManager.outcome.collectAsStateWithLifecycle()
+    restoreOutcome?.let { message ->
+        androidx.compose.material3.AlertDialog(onDismissRequest = { container.backupManager.outcome.value = null },
+            text = { Text(message) }, confirmButton = { androidx.compose.material3.TextButton(
+                onClick = { container.backupManager.outcome.value = null }) { Text("OK") } })
+    }
+    val startupReady by container.startupReady.collectAsStateWithLifecycle()
     val storeState by container.taskRepository.storeState.collectAsStateWithLifecycle()
     val uiStoreState by container.uiStateRepository.storeState.collectAsStateWithLifecycle()
-    if (storeState != com.niranjan.ticktick.domain.repository.TaskStoreState.Ready || uiStoreState != com.niranjan.ticktick.domain.repository.TaskStoreState.Ready) {
+    val focusStoreState by container.focusRepository.storeState.collectAsStateWithLifecycle()
+    if (!startupReady || focusStoreState != com.niranjan.ticktick.domain.repository.TaskStoreState.Ready || storeState != com.niranjan.ticktick.domain.repository.TaskStoreState.Ready || uiStoreState != com.niranjan.ticktick.domain.repository.TaskStoreState.Ready) {
         Box(Modifier.fillMaxSize().background(TickTickColors.Background), contentAlignment = Alignment.Center) {
             Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                val failure = (storeState as? com.niranjan.ticktick.domain.repository.TaskStoreState.Failed)
+                val failure = (focusStoreState as? com.niranjan.ticktick.domain.repository.TaskStoreState.Failed)
+                    ?: (storeState as? com.niranjan.ticktick.domain.repository.TaskStoreState.Failed)
                     ?: (uiStoreState as? com.niranjan.ticktick.domain.repository.TaskStoreState.Failed)
                 if (failure == null) {
                     androidx.compose.material3.CircularProgressIndicator()
                     Text("Loading saved data...", Modifier.padding(top = 16.dp))
                 } else {
                     Text(failure.message)
-                    androidx.compose.material3.TextButton(onClick = { container.taskRepository.retryLoad(); container.uiStateRepository.retryLoad() }) { Text("Retry") }
+                    androidx.compose.material3.TextButton(onClick = { container.focusRepository.retryLoad(); container.taskRepository.retryLoad(); container.uiStateRepository.retryLoad() }) { Text("Retry") }
                 }
             }
         }
@@ -122,8 +141,9 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
         viewModelFactory { initializer { TasksViewModel(container.taskRepository, container.clock, createSavedStateHandle(), container.reminderRepository, container.uiStateRepository) } }
     }
     val viewModel: TasksViewModel = viewModel(factory = factory)
-    val focusFactory = remember { viewModelFactory { initializer { FocusViewModel(createSavedStateHandle()) } } }
+    val focusFactory = remember { viewModelFactory { initializer { FocusViewModel(container.focusRepository) } } }
     val focus: FocusViewModel = viewModel(factory = focusFactory)
+    val focusDeliveryError by container.focusController.deliveryError.collectAsStateWithLifecycle()
     val focusState by focus.uiState.collectAsStateWithLifecycle()
     val selectionFactory = remember(container) {
         viewModelFactory { initializer { TaskSelectionViewModel(container.taskRepository, container.clock, createSavedStateHandle()) } }
@@ -168,6 +188,10 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
     val scope = rememberCoroutineScope()
     val tabState = rememberSaveableStateHolder()
     var selectedTab by rememberSaveable { mutableStateOf(if (!editorState.active && container.uiStateRepository.currentDraft("habit")?.payload != null) AppTab.Habits else AppTab.Tasks) }
+    val visibleTabs = com.niranjan.ticktick.core.settings.AppDisplay.preferences.tabs
+    LaunchedEffect(visibleTabs) {
+        if (selectedTab.name !in visibleTabs && !openFocus && !editorState.active && container.uiStateRepository.currentDraft("habit")?.payload == null) selectedTab = AppTab.Tasks
+    }
     val selecting = selectedTab == AppTab.Tasks && selectionState.active
     LaunchedEffect(selectionState.active, selectionState.tasks.isEmpty()) {
         if (!selectionState.active || selectionState.tasks.isEmpty()) selectionPanel = null
@@ -175,15 +199,13 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
     var requestedHabitId by rememberSaveable { mutableStateOf<String?>(null) }
     var requestedHabitDay by rememberSaveable { mutableStateOf<Long?>(null) }
     var returnToTasksFromHabit by rememberSaveable { mutableStateOf(false) }
-    var autoHabitOpen by rememberSaveable { mutableStateOf(false) }
     val reminderSnapshot by container.reminderRepository.reminderState.collectAsStateWithLifecycle()
     suspend fun openHabitAlert(alert: ReminderAlert, autoSound: Boolean = false): Boolean {
         val target = habitReminderTarget(alert.taskId) ?: return false
         if (!container.reminderRepository.actOnReminder(alert.id, alert.revision, ReminderAction.Dismiss)) return false
-        autoHabitOpen = true
         requestedHabitId = target.habitId
         requestedHabitDay = target.date.toEpochDay()
-        returnToTasksFromHabit = selectedTab == AppTab.Tasks
+        if (selectedTab != AppTab.Habits) returnToTasksFromHabit = selectedTab == AppTab.Tasks
         selectedTab = AppTab.Habits
         if (autoSound) container.sounds.play(com.niranjan.ticktick.domain.model.AppSound.Popup)
         return true
@@ -202,8 +224,10 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
             onReminderRequestHandled()
         }
     }
-    LaunchedEffect(reminderSnapshot.alerts, autoHabitOpen, reminderRequest, lifecycleState) {
-        if (lifecycleState == androidx.lifecycle.Lifecycle.State.RESUMED && !autoHabitOpen && reminderRequest == null) {
+    // Each selected time has its own committed delivery. A previously opened log must
+    // not suppress later deliveries; dismissing the selected delivery prevents replay.
+    LaunchedEffect(reminderSnapshot.alerts, reminderRequest, lifecycleState) {
+        if (lifecycleState == androidx.lifecycle.Lifecycle.State.RESUMED && reminderRequest == null) {
             val alert = reminderSnapshot.alerts.firstOrNull { alert ->
                 val target = habitReminderTarget(alert.taskId)
                 !alert.missed && target != null && habitSnapshot.habits.any { it.id == target.habitId && it.autoPopUp }
@@ -211,8 +235,10 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
             if (alert != null) taskWriteResult { openHabitAlert(alert, autoSound = true) }.onFailure { reminderEntryError = true }
         }
     }
+    LaunchedEffect(openFocus) { if (openFocus) { selectedTab = AppTab.Focus; onFocusOpened() } }
     var overlay by rememberSaveable { mutableStateOf<String?>(null) }
     var showOverflow by remember { mutableStateOf(false) }
+    val canEditOrganization = state.filter != TaskFilter.Today && state.filter != TaskFilter.ListFilter("inbox")
     var taskOptionsSheet by rememberSaveable { mutableStateOf<String?>(null) }
     val drawerWidth = (LocalConfiguration.current.screenWidthDp.dp * (494f / 576f)).coerceAtMost(400.dp)
 
@@ -292,7 +318,9 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
                             if (showOverflow) TaskOverflowMenu(state, onDismiss = { showOverflow = false },
                                 onChange = viewModel::updatePresentation, onCompleted = viewModel::toggleShowCompleted,
                                 onBackground = { taskOptionsSheet = "background" }, onGroupSort = { taskOptionsSheet = "groupSort" },
-                                onSelect = { taskSelection.start() })
+                                onSelect = { taskSelection.start() },
+                                onEdit = if (canEditOrganization) ({ taskOptionsSheet = "editOrganization" }) else null,
+                                onDelete = if (canEditOrganization) ({ taskOptionsSheet = "deleteOrganization" }) else null)
                         }
                     }
                 }
@@ -313,10 +341,9 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
                             onToggleTask = viewModel::toggleTask, onOpenTask = { editor.beginExisting(it.id) },
                             onOpenHabit = { habit, date -> returnToTasksFromHabit = false; requestedHabitId = habit.id; requestedHabitDay = date.toEpochDay(); selectedTab = AppTab.Habits },
                             onToggleShowCompleted = viewModel::toggleCalendarCompleted)
-                        AppTab.Focus -> FocusScreen(focusState, focus, state.snapshot.tasks)
+                        AppTab.Focus -> FocusScreen(focusState, focus, state.snapshot.tasks, focusDeliveryError, container.focusController::retry)
                         AppTab.Habits -> HabitsScreen(container.sounds, container.habitRepository, container.clock, container.uiStateRepository, requestedHabitId, requestedHabitDay,
                             onExternalDetailClosed = {
-                                autoHabitOpen = false
                                 if (returnToTasksFromHabit) selectedTab = AppTab.Tasks
                                 returnToTasksFromHabit = false
                             }, onRequestHandled = { requestedHabitId = null; requestedHabitDay = null }, currentDate = state.today)
@@ -335,7 +362,7 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
                     horizontalArrangement = Arrangement.SpaceAround,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AppTab.entries.forEach { tab ->
+                    com.niranjan.ticktick.core.settings.AppDisplay.preferences.tabs.map(AppTab::valueOf).forEach { tab ->
                         Box(
                             Modifier.weight(1f).height(56.dp)
                                 .selectable(selectedTab == tab, role = Role.Tab, onClick = { selectedTab = tab })
@@ -368,7 +395,7 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
                         .clip(CircleShape)
                         .background(Brush.linearGradient(listOf(Color(0xFF3E7AFF), Color(0xFF4D76FF))))
                         .clickable(role = Role.Button, onClick = {
-                            editor.beginNew((state.filter as? TaskFilter.ListFilter)?.listId ?: "inbox", if (state.filter == TaskFilter.Today) state.today else null)
+                            editor.beginNew((state.filter as? TaskFilter.ListFilter)?.listId ?: com.niranjan.ticktick.core.settings.AppDisplay.preferences.defaultList.takeIf { id -> state.snapshot.lists.any { it.id == id } } ?: "inbox", if (state.filter == TaskFilter.Today) state.today else null)
                         })
                         .semantics { contentDescription = "Add task" },
                     contentAlignment = Alignment.Center,
@@ -385,10 +412,18 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
     }
     TaskSelectionOverlays(selectionPanel, { selectionPanel = it }, selectionState, state, taskSelection)
     when (taskOptionsSheet) {
+        "editOrganization", "deleteOrganization" -> com.niranjan.ticktick.feature.organization.EditOrganization(
+            container.taskRepository, state.filter, taskOptionsSheet == "deleteOrganization",
+            onDismiss = { taskOptionsSheet = null }, onSaved = { renamedTag ->
+                if (taskOptionsSheet == "deleteOrganization") viewModel.selectList("inbox")
+                else if (renamedTag != null) viewModel.selectTag(renamedTag)
+            })
         "background" -> TaskBackgroundSheet(state.presentation, viewModel::updatePresentation) { taskOptionsSheet = null }
         "groupSort" -> TaskGroupSortSheet(state.presentation, viewModel::updatePresentation) { taskOptionsSheet = null }
     }
     AppOverlays(
+        uiRepository = container.uiStateRepository,
+        backupManager = container.backupManager,
         sounds = container.sounds,
         overlay = overlay, state = state, viewModel = viewModel, reminderController = container.reminderController,
         onDismiss = { overlay = null },

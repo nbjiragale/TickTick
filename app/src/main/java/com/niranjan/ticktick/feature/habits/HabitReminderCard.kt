@@ -25,7 +25,7 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val habitReminderTimeFormat = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
+private val habitReminderTimeFormat get() = com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

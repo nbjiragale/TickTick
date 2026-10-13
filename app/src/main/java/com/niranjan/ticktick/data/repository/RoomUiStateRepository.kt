@@ -5,6 +5,7 @@ import com.niranjan.ticktick.data.local.*
 import com.niranjan.ticktick.domain.repository.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -18,7 +19,7 @@ class RoomUiStateRepository(private val database: TickTickDatabase, private val 
     override val storeState = status.asStateFlow()
     private val error = MutableStateFlow<String?>(null)
     override val draftError = error.asStateFlow()
-    private val mutex = Mutex()
+    private val mutex = database.operationLock
     private val desired = mutableMapOf<String, StoredDraft>()
     private val failed = mutableSetOf<String>()
     private val queue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
@@ -29,6 +30,12 @@ class RoomUiStateRepository(private val database: TickTickDatabase, private val 
         retryLoad()
     }
 
+    suspend fun reloadAfterRestore() {
+        loading?.cancel(); loading?.join(); loading = null
+        status.value = TaskStoreState.Loading
+        retryLoad()
+        check(storeState.first { it != TaskStoreState.Loading } == TaskStoreState.Ready)
+    }
     override fun retryLoad() {
         if (loading?.isActive == true) return
         loading = scope.launch {
@@ -37,7 +44,7 @@ class RoomUiStateRepository(private val database: TickTickDatabase, private val 
                 database.invalidationTracker.createFlow("ui_preferences", "editor_drafts").collect {
                     mutex.withLock {
                         data.value = database.withTransaction {
-                            val preferences = dao.preferences().onEach { require(it.format == 1) { "Unsupported preference format" } }
+                            val preferences = dao.preferences().onEach { require(it.format == 1) { "Unsupported preference format" }; com.niranjan.ticktick.data.mapper.validateSavedPreference(it.key, it.payload) }
                             val drafts = dao.drafts().onEach { require(it.format == 1) { "Unsupported draft format" } }
                             UiSnapshot(preferences.associate { it.key to it.payload }, drafts.associate { row ->
                                 row.key to StoredDraft(DraftToken(row.key, row.sessionId, row.version), row.ownerId, row.baseRevision, row.payload, row.format)
@@ -51,11 +58,12 @@ class RoomUiStateRepository(private val database: TickTickDatabase, private val 
         }
     }
 
-    override suspend fun updatePreference(key: String, transform: (String?) -> String) = mutex.withLock {
+    override suspend fun updatePreference(key: String, transform: (String?) -> String) = database.writeLocked {
         check(status.value == TaskStoreState.Ready)
         withContext(NonCancellable) {
             val next = database.withTransaction {
                 val next = transform(dao.preference(key)?.payload)
+                com.niranjan.ticktick.data.mapper.validateSavedPreference(key, next)
                 dao.putPreference(UiPreferenceEntity(key, payload = next))
                 next
             }
@@ -66,6 +74,7 @@ class RoomUiStateRepository(private val database: TickTickDatabase, private val 
     override fun currentDraft(key: String): StoredDraft? = synchronized(desired) { desired[key] ?: data.value.drafts[key] }
 
     override fun stageDraft(key: String, sessionId: String, ownerId: String, baseRevision: Long, payload: String?, newSession: Boolean): DraftToken = synchronized(desired) {
+        if (database.restoring.value) return@synchronized DraftToken(key, sessionId, 0)
         val previous = desired[key] ?: data.value.drafts[key]
         // An old editor may finish an in-flight save after its replacement opened. Ignore that publisher.
         if (previous != null && previous.token.sessionId != sessionId && !newSession)
@@ -77,9 +86,11 @@ class RoomUiStateRepository(private val database: TickTickDatabase, private val 
     }
 
     private fun enqueue(record: StoredDraft, replaceSession: Boolean) {
+        val generation = database.generation
         queue.trySend {
             try {
                 mutex.withLock {
+                    if (generation != database.generation) return@withLock
                     database.withTransaction {
                         val old = dao.draft(record.token.key)
                         require(old == null || old.sessionId == record.token.sessionId || replaceSession) { "Draft session changed" }
@@ -106,6 +117,8 @@ class RoomUiStateRepository(private val database: TickTickDatabase, private val 
         }
         barrier.await()
     }
+
+    fun clearPendingDraftsAfterRestore() = synchronized(desired) { desired.clear(); failed.clear(); error.value = null }
 
     override fun retryDrafts() = synchronized(desired) {
         failed.toList().mapNotNull { desired[it] }.forEach { enqueue(it, replaceSession = true) }

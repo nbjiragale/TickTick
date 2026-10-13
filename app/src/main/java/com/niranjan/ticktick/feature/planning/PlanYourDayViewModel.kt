@@ -128,9 +128,9 @@ class PlanYourDayViewModel(private val repository: TaskRepository, val clock: Cl
         publish(session.value.copy(selectedId = id))
     }
     fun clearError() { publish(session.value.copy(error = null)); if (!writing) persist(session.value.encode()) }
-    fun cancelMenu() { publish(session.value.copy(menuTaskId = null, menu = null, error = null)) }
+    fun cancelMenu() { if (writing) return; publish(session.value.copy(menuTaskId = null, menu = null, error = null)) }
     fun back() { if (session.value.menu != null) cancelMenu() else close() }
-    fun cancelDelete() { publish(session.value.copy(deleteId = null)) }
+    fun cancelDelete() { if (writing) return; publish(session.value.copy(deleteId = null)) }
 
     private fun taskForAction(id: String): Task? = repository.snapshot.value.tasks.find {
         session.value.active && session.value.date == LocalDate.now(clock) &&
@@ -162,13 +162,14 @@ class PlanYourDayViewModel(private val repository: TaskRepository, val clock: Cl
 
     fun done(id: String) = commit(id) { task, checkpoint -> repository.setCompleted(task.id, true, task.revision, checkpoint) }
     fun wontDo(id: String) = commit(id) { task, checkpoint -> repository.setDeclined(task.id, true, checkpoint) }
-    fun requestDelete(id: String) { if (taskForAction(id) != null) publish(session.value.copy(deleteId = id)) }
+    fun requestDelete(id: String) { if (writing) return; if (taskForAction(id) != null) publish(session.value.copy(deleteId = id)) }
     fun confirmDelete() { session.value.deleteId?.let { id -> commit(id) { task, checkpoint -> repository.deleteTask(task.id, checkpoint = checkpoint) } } }
 
     fun today(id: String) = showMenu(id, PlanningMenu.Today)
     fun later(id: String) = showMenu(id, PlanningMenu.Later)
 
     private fun showMenu(id: String, menu: PlanningMenu) {
+        if (writing) return
         if (taskForAction(id) != null) publish(session.value.copy(selectedId = id, menuTaskId = id, menu = menu, error = null))
     }
 

@@ -95,12 +95,7 @@ fun PlanYourDayHost(state: PlanYourDayState, vm: PlanYourDayViewModel) {
                     val enabled = !pager.isScrollInProgress && state.deleteId == null
                     when (state.menu.takeIf { state.menuTaskId == task.id }) {
                     PlanningMenu.Today -> TodayPeriod.entries.forEach { period ->
-                        PlanningChoice(period.label, when (period) {
-                            TodayPeriod.Morning -> "10 AM"
-                            TodayPeriod.Afternoon -> "1 PM"
-                            TodayPeriod.Evening -> "5 PM"
-                            TodayPeriod.Night -> "9 PM"
-                        }, enabled, Modifier.weight(1f)) { vm.chooseToday(task.id, period) }
+                        PlanningChoice(period.label, java.time.LocalTime.of(period.hour, 0).format(com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter), enabled, Modifier.weight(1f)) { vm.chooseToday(task.id, period) }
                     }
                     PlanningMenu.Later -> LaterDay.entries.forEach { day ->
                         PlanningChoice(day.label, state.today.plusDays(day.days).format(DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH)),
@@ -156,7 +151,7 @@ private fun PlanningCard(task: Task, list: TaskList?, today: LocalDate, progress
                     date == today.plusDays(1) -> "Tomorrow"
                     else -> date.format(DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH))
                 }
-                Text(dateLabel + (task.dueTime?.let { " · ${it.format(DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))}" } ?: ""),
+                Text(dateLabel + (task.dueTime?.let { " · ${it.format(com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter)}" } ?: ""),
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (date != null && date < today) Color(0xFFC34F58) else TickTickColors.DueTime)
                 Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {

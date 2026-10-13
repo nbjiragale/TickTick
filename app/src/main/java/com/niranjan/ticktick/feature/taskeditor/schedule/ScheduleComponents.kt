@@ -43,7 +43,7 @@ internal val ScheduleLabelBlue = Color(0xFF557EBA)
 internal val ScheduleMuted = Color(0xFFAAAAAA)
 internal val ScheduleInk = Color(0xFF303231)
 internal val ScheduleRed = Color(0xFFC73542)
-internal fun LocalTime.label(): String = format(DateTimeFormatter.ofPattern("h:mma", Locale.ENGLISH))
+internal fun LocalTime.label(): String = format(com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter)
 internal fun LocalDate.label(): String = format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.ENGLISH))
 
 @Composable
@@ -123,9 +123,9 @@ internal fun MonthCalendar(selected: Set<LocalDate>, today: LocalDate, onSelect:
             ScheduleIcon(AppSymbol.Chevron, "Next month", { monthText = month.plusMonths(1).toString() }, tint = ScheduleMuted)
         }
         Row(Modifier.height(28.dp), verticalAlignment = Alignment.CenterVertically) {
-            listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEach { Text(it, Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 12.sp, color = ScheduleMuted) }
+            com.niranjan.ticktick.core.settings.AppDisplay.weekdayLabels.forEach { Text(it, Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 12.sp, color = ScheduleMuted) }
         }
-        val offset = month.atDay(1).dayOfWeek.value % 7
+        val offset = java.time.temporal.ChronoUnit.DAYS.between(com.niranjan.ticktick.core.settings.AppDisplay.weekStart(month.atDay(1)), month.atDay(1)).toInt()
         val rows = (offset + month.lengthOfMonth() + 6) / 7
         repeat(rows) { week ->
             Row(Modifier.fillMaxWidth().height(43.dp)) {
