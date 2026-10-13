@@ -113,7 +113,7 @@ fun TaskRow(task: Task, today: LocalDate, onToggle: () -> Unit, onOpen: () -> Un
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 val detailDate = task.dueDate?.let { date ->
                     (if (date == today) "Today" else date.format(DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH))) +
-                        (task.dueTime?.let { ", ${it.format(DateTimeFormatter.ofPattern("h:mma", Locale.ENGLISH))}" } ?: "")
+                        (task.dueTime?.let { ", ${it.format(com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter)}" } ?: "")
                 }.orEmpty()
                 if (detailDate.isNotEmpty()) Text(detailDate,
                     Modifier.weight(1f).alignByBaseline()
@@ -152,7 +152,7 @@ private fun DetailNoteIcon() {
 
 fun Task.dueLabel(today: LocalDate): String = when {
     dueDate == null -> ""
-    dueDate == today -> dueTime?.format(DateTimeFormatter.ofPattern("h:mma", Locale.ENGLISH)) ?: "Today"
+    dueDate == today -> dueTime?.format(com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter) ?: "Today"
     dueDate == today.plusDays(1) -> "Tomorrow"
     else -> dueDate.format(DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH))
 }

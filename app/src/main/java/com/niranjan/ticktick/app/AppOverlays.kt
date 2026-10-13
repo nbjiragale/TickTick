@@ -34,6 +34,7 @@ import com.niranjan.ticktick.feature.organization.AddFilterScreen
 /** Basic functional dialogs pending the next reference screenshots. */
 @Composable
 fun AppOverlays(
+    uiRepository: com.niranjan.ticktick.domain.repository.UiStateRepository,
     backupManager: com.niranjan.ticktick.platform.backup.BackupManager,
     sounds: com.niranjan.ticktick.platform.sounds.AppSounds,
     reminderController: com.niranjan.ticktick.platform.reminders.ReminderController,
@@ -106,8 +107,7 @@ fun AppOverlays(
                     com.niranjan.ticktick.feature.settings.SoundSettings(sounds)
                     com.niranjan.ticktick.feature.reminders.ReminderSettings(reminderController)
                     com.niranjan.ticktick.feature.settings.BackupSettings(backupManager)
-                    Text("Appearance", fontWeight = FontWeight.Medium)
-                    Text("Light", color = TickTickColors.SecondaryText)
+                    com.niranjan.ticktick.feature.settings.LocalSettings(uiRepository, state.snapshot.lists)
                     TextButton(onClick = viewModel::toggleShowCompleted) { Text(if (state.showCompleted) "Hide completed tasks" else "Show completed tasks") }
                     TextButton(onClick = viewModel::toggleSort) { Text(if (state.sortByTime) "Sort tasks by creation time" else "Sort tasks by due date") }
                 }

@@ -6,6 +6,7 @@ import org.json.JSONObject
 internal fun validateSavedPreference(key: String, payload: String) {
     val j = JSONObject(payload)
     when {
+        key == "app" -> com.niranjan.ticktick.core.settings.AppPreferences.decode(payload)
         key.startsWith("tasks:") -> com.niranjan.ticktick.feature.tasks.taskPresentation(payload, com.niranjan.ticktick.feature.tasks.TaskPresentation())
         key == "calendar" -> {
             require(j.optString("view", "Month") in setOf("List", "Day", "Week", "Month"))

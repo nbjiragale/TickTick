@@ -17,7 +17,7 @@ object TickTickColors {
     val Surface = Color.White
     val Text = Color(0xFF202124)
     val SecondaryText = Color(0xFF96989C)
-    val Accent = Color(0xFF4778FF)
+    val Accent get() = Color(com.niranjan.ticktick.core.settings.AppDisplay.preferences.accent)
     val DueTime = Color(0xFF557EB9)
     val TodayChip = Color(0xFFE0E7F9)
     val Checkbox = Color(0xFFB1B3B5)

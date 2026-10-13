@@ -77,11 +77,11 @@ internal fun TaskEditorState.dateLabel(today: LocalDate, full: Boolean = false):
         today.minusDays(1) -> "Yesterday"
         else -> date.format(DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH))
     }
-    val time = dueTime?.format(DateTimeFormatter.ofPattern("h:mma", Locale.ENGLISH))
+    val time = dueTime?.format(com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter)
     duration?.let { range ->
         val endDay = if (range.endDate == date) "" else range.endDate.format(DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH)) + ", "
         if (range.allDay) return if (range.startDate == range.endDate) "$day, All day" else "$day – ${range.endDate.format(DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH))}, All day"
-        return "$day, $time – $endDay${range.endTime.format(DateTimeFormatter.ofPattern("h:mma", Locale.ENGLISH))}"
+        return "$day, $time – $endDay${range.endTime.format(com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter)}"
     }
     return day + if (time != null) ", $time" else ""
 }

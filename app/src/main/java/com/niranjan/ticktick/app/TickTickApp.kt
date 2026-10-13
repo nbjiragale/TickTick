@@ -187,6 +187,10 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
     val scope = rememberCoroutineScope()
     val tabState = rememberSaveableStateHolder()
     var selectedTab by rememberSaveable { mutableStateOf(if (!editorState.active && container.uiStateRepository.currentDraft("habit")?.payload != null) AppTab.Habits else AppTab.Tasks) }
+    val visibleTabs = com.niranjan.ticktick.core.settings.AppDisplay.preferences.tabs
+    LaunchedEffect(visibleTabs) {
+        if (selectedTab.name !in visibleTabs && !openFocus && !editorState.active && container.uiStateRepository.currentDraft("habit")?.payload == null) selectedTab = AppTab.Tasks
+    }
     val selecting = selectedTab == AppTab.Tasks && selectionState.active
     LaunchedEffect(selectionState.active, selectionState.tasks.isEmpty()) {
         if (!selectionState.active || selectionState.tasks.isEmpty()) selectionPanel = null
@@ -233,6 +237,7 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
     LaunchedEffect(openFocus) { if (openFocus) { selectedTab = AppTab.Focus; onFocusOpened() } }
     var overlay by rememberSaveable { mutableStateOf<String?>(null) }
     var showOverflow by remember { mutableStateOf(false) }
+    val canEditOrganization = state.filter != TaskFilter.Today && state.filter != TaskFilter.ListFilter("inbox")
     var taskOptionsSheet by rememberSaveable { mutableStateOf<String?>(null) }
     val drawerWidth = (LocalConfiguration.current.screenWidthDp.dp * (494f / 576f)).coerceAtMost(400.dp)
 
@@ -312,7 +317,9 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
                             if (showOverflow) TaskOverflowMenu(state, onDismiss = { showOverflow = false },
                                 onChange = viewModel::updatePresentation, onCompleted = viewModel::toggleShowCompleted,
                                 onBackground = { taskOptionsSheet = "background" }, onGroupSort = { taskOptionsSheet = "groupSort" },
-                                onSelect = { taskSelection.start() })
+                                onSelect = { taskSelection.start() },
+                                onEdit = if (canEditOrganization) ({ taskOptionsSheet = "editOrganization" }) else null,
+                                onDelete = if (canEditOrganization) ({ taskOptionsSheet = "deleteOrganization" }) else null)
                         }
                     }
                 }
@@ -355,7 +362,7 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
                     horizontalArrangement = Arrangement.SpaceAround,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AppTab.entries.forEach { tab ->
+                    com.niranjan.ticktick.core.settings.AppDisplay.preferences.tabs.map(AppTab::valueOf).forEach { tab ->
                         Box(
                             Modifier.weight(1f).height(56.dp)
                                 .selectable(selectedTab == tab, role = Role.Tab, onClick = { selectedTab = tab })
@@ -388,7 +395,7 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
                         .clip(CircleShape)
                         .background(Brush.linearGradient(listOf(Color(0xFF3E7AFF), Color(0xFF4D76FF))))
                         .clickable(role = Role.Button, onClick = {
-                            editor.beginNew((state.filter as? TaskFilter.ListFilter)?.listId ?: "inbox", if (state.filter == TaskFilter.Today) state.today else null)
+                            editor.beginNew((state.filter as? TaskFilter.ListFilter)?.listId ?: com.niranjan.ticktick.core.settings.AppDisplay.preferences.defaultList.takeIf { id -> state.snapshot.lists.any { it.id == id } } ?: "inbox", if (state.filter == TaskFilter.Today) state.today else null)
                         })
                         .semantics { contentDescription = "Add task" },
                     contentAlignment = Alignment.Center,
@@ -405,10 +412,17 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
     }
     TaskSelectionOverlays(selectionPanel, { selectionPanel = it }, selectionState, state, taskSelection)
     when (taskOptionsSheet) {
+        "editOrganization", "deleteOrganization" -> com.niranjan.ticktick.feature.organization.EditOrganization(
+            container.taskRepository, state.filter, taskOptionsSheet == "deleteOrganization",
+            onDismiss = { taskOptionsSheet = null }, onSaved = { renamedTag ->
+                if (taskOptionsSheet == "deleteOrganization") viewModel.selectList("inbox")
+                else if (renamedTag != null) viewModel.selectTag(renamedTag)
+            })
         "background" -> TaskBackgroundSheet(state.presentation, viewModel::updatePresentation) { taskOptionsSheet = null }
         "groupSort" -> TaskGroupSortSheet(state.presentation, viewModel::updatePresentation) { taskOptionsSheet = null }
     }
     AppOverlays(
+        uiRepository = container.uiStateRepository,
         backupManager = container.backupManager,
         sounds = container.sounds,
         overlay = overlay, state = state, viewModel = viewModel, reminderController = container.reminderController,

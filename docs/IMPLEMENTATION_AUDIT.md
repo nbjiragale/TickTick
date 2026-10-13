@@ -7,11 +7,11 @@ Audit date: 2026-10-13. Baseline: `80c2158`. Scope follows the current backend p
 | Tasks, recurrence, habits | Room persistence, revision checks, reminder reconciliation already implemented | Preserve existing behavior; device acceptance pending |
 | Focus | SavedStateHandle only; history and background completion not durable | Schema 6 session/history, elapsed-realtime recovery, completion alarms and worker recovery |
 | Backup | No export/import workflow | Versioned JSON, staging database validation, atomic replacement, pre-restore recovery copy, repository reload |
-| Settings | Sounds supported; appearance/date/navigation defaults absent | Implementation in progress |
-| Organization | Lists, tags, filters could only be created | Implementation in progress |
+| Settings | Sounds supported; appearance/date/navigation defaults absent | Room-backed navigation, accent, week/time format, task defaults |
+| Organization | Lists, tags, filters could only be created | Transactional edit/delete, task reassignment, token/filter updates |
 | Search | Title only | Search title and description |
-| Habit feedback | No completion celebration | Implementation in progress |
-| Build delivery | No documented reproducible setup or CI | Implementation in progress |
+| Habit feedback | No completion celebration | Confetti on committed transition; reduced motion respected |
+| Build delivery | No documented reproducible setup or CI | README and debug/release APK build workflow |
 
 ## Acceptance still required
 

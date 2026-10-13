@@ -100,7 +100,7 @@ class TaskEditorViewModel(
         newDraftSession = true
         saveJob?.cancel()
         attachmentJob?.cancel()
-        publish(TaskEditorState(active = true, id = UUID.randomUUID().toString(), listId = listId, contextDate = contextDate))
+        publish(TaskEditorState(active = true, id = UUID.randomUUID().toString(), listId = listId, contextDate = contextDate, reminders = com.niranjan.ticktick.domain.model.ReminderConfig(dateOnlyTime = com.niranjan.ticktick.core.settings.AppPreferences.decode(drafts.snapshot.value.preferences["app"]).defaultReminderTime)))
     }
 
     fun beginExisting(id: String) {

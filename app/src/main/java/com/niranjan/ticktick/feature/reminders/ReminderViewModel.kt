@@ -278,7 +278,7 @@ private fun Instant.confirmationMessage(durationMinutes: Long?, clock: Clock): S
         today.plusDays(1) -> "tomorrow"
         else -> "on ${local.format(java.time.format.DateTimeFormatter.ofPattern("MMM d", java.util.Locale.ENGLISH))}"
     }
-    val time = local.format(java.time.format.DateTimeFormatter.ofPattern("h:mma", java.util.Locale.ENGLISH))
+    val time = local.format(com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter)
     return "We'll remind you $day at $time."
 }
 
@@ -301,5 +301,5 @@ internal fun Instant.snoozeLabel(clock: Clock): String {
         today.plusDays(1) -> "Tomorrow"
         else -> local.format(java.time.format.DateTimeFormatter.ofPattern("MMM d", java.util.Locale.ENGLISH))
     }
-    return "$day ${local.format(java.time.format.DateTimeFormatter.ofPattern("h:mma", java.util.Locale.ENGLISH))}"
+    return "$day ${local.format(com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter)}"
 }

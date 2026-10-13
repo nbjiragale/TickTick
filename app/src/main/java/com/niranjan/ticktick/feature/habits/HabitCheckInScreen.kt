@@ -111,6 +111,7 @@ internal fun HabitCheckInScreen(
                 }
             }
             BoxWithConstraints(Modifier.weight(1f)) {
+                HabitCelebration("${habit.id}:$date", completed)
                 val height = maxHeight
                 Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                     Column(Modifier.fillMaxWidth().heightIn(min = height), horizontalAlignment = Alignment.CenterHorizontally) {

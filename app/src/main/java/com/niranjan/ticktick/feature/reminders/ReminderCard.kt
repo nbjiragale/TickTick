@@ -84,5 +84,5 @@ private fun Task.reminderDueLabel(clock: Clock): String {
         today.minusDays(1) -> "Yesterday"
         else -> dueDate?.format(DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH)).orEmpty()
     }
-    return day + (dueTime?.format(DateTimeFormatter.ofPattern("h:mma", Locale.ENGLISH))?.let { ", $it" } ?: "")
+    return day + (dueTime?.format(com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter)?.let { ", $it" } ?: "")
 }

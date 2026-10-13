@@ -159,6 +159,80 @@ internal class TaskMutation(initial: TaskSnapshot, private val clock: Clock = Cl
         return id
     }
 
+    private fun listToken(list: TaskList): String = "~${when (list.symbol) {
+        ListSymbol.Inbox -> "📥"; ListSymbol.Work -> "💼"; ListSymbol.Personal -> "🏠"
+        ListSymbol.Welcome -> "👋"; ListSymbol.Custom -> "☰"
+    }}${list.name}"
+    private fun Task.moveList(old: TaskList, new: TaskList): Task = copy(listId = new.id,
+        title = Regex("(?<!\\S)${Regex.escape(listToken(old))}(?!\\S)").replace(title) { listToken(new) },
+        modifiedAt = clock.instant(), revision = revision + 1)
+
+    fun editList(id: String, name: String, color: Int?, view: TaskListView) {
+        require(id != "inbox") { "Inbox cannot be edited." }
+        val trimmed = name.trim()
+        require(trimmed.isNotBlank()) { "Enter a list name." }
+        update { current ->
+            val old = current.lists.firstOrNull { it.id == id } ?: error("This list was removed.")
+            require(current.lists.none { it.id != id && it.name.equals(trimmed, true) }) { "A list with this name already exists." }
+            val new = old.copy(name = trimmed, color = color, view = view)
+            current.copy(lists = current.lists.map { if (it.id == id) new else it },
+                tasks = current.tasks.map { if (it.listId == id && old.name != new.name) it.moveList(old, new) else it })
+        }
+    }
+    fun deleteList(id: String) {
+        require(id != "inbox") { "Inbox cannot be deleted." }
+        update { current ->
+            val old = current.lists.firstOrNull { it.id == id } ?: error("This list was removed.")
+            val inbox = current.lists.first { it.id == "inbox" }
+            current.copy(lists = current.lists.filterNot { it.id == id },
+                tasks = current.tasks.map { if (it.listId == id) it.moveList(old, inbox) else it },
+                filters = current.filters.map { filter -> filter.copy(rules = filter.rules.map {
+                    if (it.field == FilterField.List && it.value == id) it.copy(value = "inbox") else it
+                }) })
+        }
+    }
+    private fun tagPattern(name: String) = Regex("(?<![\\p{L}\\p{N}_])#${Regex.escape(name)}(?![\\p{L}\\p{N}_-])", RegexOption.IGNORE_CASE)
+    fun editTag(oldName: String, name: String, color: Int?) {
+        val trimmed = name.trim().removePrefix("#")
+        require(Regex("[\\p{L}\\p{N}_-]+").matches(trimmed)) { "Use letters, numbers, underscores or hyphens." }
+        update { current ->
+            require(current.knownTags.any { it.name.equals(oldName, true) }) { "This tag was removed." }
+            require(current.knownTags.none { !it.name.equals(oldName, true) && it.name.equals(trimmed, true) }) { "A tag with this name already exists." }
+            current.copy(tags = current.tags.filterNot { it.name.equals(oldName, true) } + TaskTag(trimmed, color),
+                tasks = current.tasks.map { task ->
+                    if (task.tags.none { it.equals(oldName, true) }) task else task.copy(
+                        tags = task.tags.map { if (it.equals(oldName, true)) trimmed else it },
+                        title = tagPattern(oldName).replace(task.title) { "#$trimmed" },
+                        modifiedAt = clock.instant(), revision = task.revision + 1)
+                }, filters = current.filters.map { filter -> filter.copy(rules = filter.rules.map {
+                    if (it.field == FilterField.Tag && it.value.equals(oldName, true)) it.copy(value = trimmed) else it
+                }) })
+        }
+    }
+    fun deleteTag(name: String) {
+        update { current ->
+            require(current.knownTags.any { it.name.equals(name, true) }) { "This tag was removed." }
+            current.copy(tags = current.tags.filterNot { it.name.equals(name, true) }, tasks = current.tasks.map { task ->
+                if (task.tags.none { it.equals(name, true) }) task else task.copy(
+                    tags = task.tags.filterNot { it.equals(name, true) },
+                    title = tagPattern(name).replace(task.title, "").trim().ifBlank { name },
+                    modifiedAt = clock.instant(), revision = task.revision + 1)
+            })
+        }
+    }
+    fun editFilter(id: String, name: String, rules: List<FilterRule>, matchAll: Boolean) {
+        val trimmed = name.trim()
+        require(trimmed.isNotBlank() && rules.isNotEmpty()) { "Enter a name and add at least one condition." }
+        update { current ->
+            require(current.filters.any { it.id == id }) { "This filter was removed." }
+            require(current.filters.none { it.id != id && it.name.equals(trimmed, true) }) { "A filter with this name already exists." }
+            current.copy(filters = current.filters.map { if (it.id == id) it.copy(name = trimmed, rules = rules.toList(), matchAll = matchAll) else it })
+        }
+    }
+    fun deleteFilter(id: String) {
+        update { current -> current.copy(filters = current.filters.filterNot { it.id == id }) }
+    }
+
     fun deleteTask(id: String) {
         deleteTasks(setOf(id))
     }
@@ -176,7 +250,7 @@ internal class TaskMutation(initial: TaskSnapshot, private val clock: Clock = Cl
         update { current ->
             val restored = deleted.tasks.filter { (_, task) -> current.tasks.none { it.id == task.id } }
             val tasks = current.tasks.toMutableList()
-            restored.sortedBy { it.first }.forEach { (index, task) -> tasks.add(index.coerceIn(0, tasks.size), task.copy(revision = task.revision + 1)) }
+            restored.sortedBy { it.first }.forEach { (index, task) -> tasks.add(index.coerceIn(0, tasks.size), task.copy(revision = task.revision + 1, listId = task.listId.takeIf { id -> current.lists.any { it.id == id } } ?: "inbox")) }
             current.copy(tasks = tasks, snoozedUntil = current.snoozedUntil + deleted.snoozedUntil.filterKeys { id -> restored.any { it.second.id == id } },
                 occurrenceHistory = current.occurrenceHistory + deleted.history.filter { row -> restored.any { it.second.id == row.taskId } })
         }

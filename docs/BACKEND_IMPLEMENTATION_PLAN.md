@@ -97,7 +97,7 @@ Statuses: **Not started**, **In progress**, **Implemented; validation pending**,
 | B4 | Habit persistence, rules and reminders | B1-B3 | Implemented, including September 27 popup repair; validation pending |
 | B5 | Durable preferences, drafts and remaining view integration | B1; B3/B4 for occurrences | Implemented, including four sound preferences; validation pending |
 | B6 | Attachment ownership and recovery | B1, B5 | Implemented; validation pending |
-| B7 | Durable Focus sessions and completion | B1, B2, B5 | Not started |
+| B7 | Durable Focus sessions and completion | B1, B2, B5 | Implemented; validation pending |
 | B8 | Local export/restore and maintenance | B3-B7 | Implemented; validation pending |
 | B9 | Production wiring and reliability acceptance | B1-B8 | In progress |
 
@@ -387,3 +387,11 @@ Next: record B7 build evidence, then reconstruct B8 export/restore and finish th
 `platform/backup/BackupManager.kt` snapshots all Room tables in a transaction, bounds imports to 32 MiB/100,000 records, validates schema/columns/types/foreign keys and domain values in a separate in-memory database, and previews record counts and unavailable attachments. Restore saves a synced pre-restore JSON copy before atomically replacing rows. Imported running Focus sessions pause, revisions advance, old reminder alarms cancel and current repositories reload. Shared database serialization and a generation guard prevent queued old draft writes from returning after restore. UI displays durable restore outcomes across activity recreation. Recovery-copy attachment references are retained by cleanup. Android auto-backup excludes the database and private files; the app's explicit JSON workflow documents that media bytes/provider grants are excluded.
 
 Changed areas: backup/settings UI, Room repository write coordination/reload, application/activity reset, reminder cancellation, backup XML, Room schema 6 export. Debug assembly passed; runtime rollback, migration, stale-action and document-provider acceptance remain pending.
+
+### Local workflow completion — 2026-10-13
+
+Organization edit/delete now uses the existing task menu and repository transaction boundary. Inbox is protected; list deletion moves tasks and list filter conditions to Inbox; tag rename updates assignments/title tokens/filter conditions; tag deletion keeps unmatched saved filter conditions. A title consisting only of a deleted tag retains plain text without `#`. Undo after list deletion falls back to Inbox. Room removes obsolete organization rows after child links are updated.
+
+Room-backed app preferences now control visible tab order, light-theme accent, calendar week start, time labels, default list and date-only reminder time for new tasks. Existing schedules and habit history rules do not change. Committed habit completion triggers reduced-motion-aware confetti; opening already completed history does not replay it.
+
+Changed areas: domain repository and mutation coordinator, DAO/mapper, organization editors/menu, `core/settings`, settings UI, calendar/schedule/task/reminder time labels and habit completion UI. Debug assembly passed in 1m 37s (7 executed, 31 up-to-date), log `/tmp/settings-build.log`. Device behavior remains unverified. Next: final reliability review and debug/release assembly.

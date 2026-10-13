@@ -26,18 +26,18 @@ import com.niranjan.ticktick.core.designsystem.TickTickColors
 import com.niranjan.ticktick.domain.model.*
 
 @Composable
-fun AddFilterScreen(snapshot: TaskSnapshot, onDismiss: () -> Unit, onSave: suspend (String, List<FilterRule>, Boolean) -> Result<Unit>) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var advanced by rememberSaveable { mutableStateOf(false) }
-    var matchAll by rememberSaveable { mutableStateOf(true) }
-    var rules by rememberSaveable { mutableStateOf(arrayListOf<FilterRule>()) }
+fun AddFilterScreen(snapshot: TaskSnapshot, onDismiss: () -> Unit, initial: SavedTaskFilter? = null, onSave: suspend (String, List<FilterRule>, Boolean) -> Result<Unit>) {
+    var name by rememberSaveable { mutableStateOf(initial?.name.orEmpty()) }
+    var advanced by rememberSaveable { mutableStateOf(initial != null) }
+    var matchAll by rememberSaveable { mutableStateOf(initial?.matchAll ?: true) }
+    var rules by rememberSaveable { mutableStateOf(ArrayList(initial?.rules.orEmpty())) }
     var editing by rememberSaveable { mutableStateOf<Int?>(null) }
     var normalField by rememberSaveable { mutableStateOf<FilterField?>(null) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    OrganizationFrame("Add Filter", name, { name = it; error = null }, AppSymbol.Filter,
-        name.isNotBlank() || rules.isNotEmpty(), error, onDismiss, {
+    OrganizationFrame(if (initial == null) "Add Filter" else "Edit Filter", name, { name = it; error = null }, AppSymbol.Filter,
+        name != initial?.name.orEmpty() || rules != initial?.rules.orEmpty() || matchAll != (initial?.matchAll ?: true), error, onDismiss, {
             if (!saving) {
                 saving = true
                 scope.launch {

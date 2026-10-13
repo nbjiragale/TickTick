@@ -40,7 +40,7 @@ import com.niranjan.ticktick.core.designsystem.TickTickColors
 
 @Composable
 fun TaskOverflowMenu(state: TasksUiState, onDismiss: () -> Unit, onChange: ((TaskPresentation) -> TaskPresentation) -> Unit,
-    onCompleted: () -> Unit, onBackground: () -> Unit, onGroupSort: () -> Unit, onSelect: () -> Unit) {
+    onCompleted: () -> Unit, onBackground: () -> Unit, onGroupSort: () -> Unit, onSelect: () -> Unit, onEdit: (() -> Unit)? = null, onDelete: (() -> Unit)? = null) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val width = (LocalConfiguration.current.screenWidthDp.dp - 24.dp).coerceAtMost(244.dp)
     Popup(alignment = Alignment.TopEnd, offset = IntOffset(0, 0), onDismissRequest = onDismiss,
@@ -74,6 +74,8 @@ fun TaskOverflowMenu(state: TasksUiState, onDismiss: () -> Unit, onChange: ((Tas
                 HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 10.dp), color = Color(0xFFF1F1F1))
                 OptionRow("Group & Sort", AppSymbol.Sort, { onDismiss(); onGroupSort() })
                 OptionRow("Select", AppSymbol.PlanDone, { onDismiss(); onSelect() })
+                onEdit?.let { action -> OptionRow("Edit", AppSymbol.Pencil, { onDismiss(); action() }) }
+                onDelete?.let { action -> OptionRow("Delete", AppSymbol.Trash, { onDismiss(); action() }) }
             }
         }
     }

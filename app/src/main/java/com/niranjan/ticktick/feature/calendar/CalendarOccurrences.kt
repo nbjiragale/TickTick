@@ -108,7 +108,7 @@ fun Task.timedSlotOn(date: LocalDate): Pair<LocalTime, LocalTime>? {
 }
 
 /** Sunday-start weeks, matching the existing schedule-picker month calendar. */
-internal fun sundayStart(date: LocalDate): LocalDate = date.minusDays((date.dayOfWeek.value % 7).toLong())
+internal fun sundayStart(date: LocalDate): LocalDate = com.niranjan.ticktick.core.settings.AppDisplay.weekStart(date)
 
 /** A timed task with its overlap-cluster column assignment. */
 internal data class PositionedTask(val item: CalendarItem.TaskItem, val column: Int, val columns: Int)

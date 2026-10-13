@@ -67,7 +67,7 @@ internal val CalendarItem.category: CalendarCategory
         is CalendarItem.HolidayItem -> CalendarCategory.Holiday
     }
 
-private val BlockTimeFormat = DateTimeFormatter.ofPattern("h:mma", Locale.ENGLISH)
+private val BlockTimeFormat get() = com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter
 private val HeaderDateFormat = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.ENGLISH)
 
 internal fun LocalTime.blockLabel(): String = format(BlockTimeFormat)

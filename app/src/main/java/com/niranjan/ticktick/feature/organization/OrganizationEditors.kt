@@ -47,15 +47,15 @@ import com.niranjan.ticktick.domain.model.TaskListView
 internal val OrganizationBackground = Color(0xFFF3F3F9)
 
 @Composable
-fun AddListOrTagScreen(tag: Boolean, onDismiss: () -> Unit, onSave: suspend (String, Int?, TaskListView) -> Result<Unit>) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var color by rememberSaveable { mutableStateOf<Int?>(null) }
-    var view by rememberSaveable { mutableStateOf(TaskListView.List) }
+fun AddListOrTagScreen(tag: Boolean, onDismiss: () -> Unit, initialName: String = "", initialColor: Int? = null, initialView: TaskListView = TaskListView.List, editing: Boolean = false, onSave: suspend (String, Int?, TaskListView) -> Result<Unit>) {
+    var name by rememberSaveable { mutableStateOf(initialName) }
+    var color by rememberSaveable { mutableStateOf(initialColor) }
+    var view by rememberSaveable { mutableStateOf(initialView) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    OrganizationFrame(if (tag) "Add Tag" else "Add List", name, { name = it; error = null },
-        if (tag) AppSymbol.Tag else AppSymbol.Menu, name.isNotBlank() || color != null || view != TaskListView.List,
+    OrganizationFrame("${if (editing) "Edit" else "Add"} ${if (tag) "Tag" else "List"}", name, { name = it; error = null },
+        if (tag) AppSymbol.Tag else AppSymbol.Menu, name != initialName || color != initialColor || view != initialView,
         error, onDismiss, {
             if (!saving) {
                 saving = true
@@ -128,7 +128,7 @@ internal fun OrganizationFrame(title: String, name: String, onName: (String) -> 
             }
         }
         if (confirmDiscard) AlertDialog(onDismissRequest = { confirmDiscard = false }, title = { Text("Discard changes?") },
-            text = { Text("Your new item hasn't been saved.") },
+            text = { Text("Your changes haven't been saved.") },
             confirmButton = { TextButton(onClick = onDismiss) { Text("Discard") } },
             dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep editing") } })
     }

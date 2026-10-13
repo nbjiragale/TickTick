@@ -49,6 +49,11 @@ class AppContainer(application: Application) {
         })
     init {
         applicationScope.launch {
+            uiStateRepository.snapshot.collect { snapshot ->
+                com.niranjan.ticktick.core.settings.AppDisplay.preferences = com.niranjan.ticktick.core.settings.AppPreferences.decode(snapshot.preferences["app"])
+            }
+        }
+        applicationScope.launch {
             database.restoring.collect { if (!it) { reminderController.requestReconcile(force = true); focusController.retry() } }
         }
         taskStore.onReminderChange = { reminderController.requestReconcile() }

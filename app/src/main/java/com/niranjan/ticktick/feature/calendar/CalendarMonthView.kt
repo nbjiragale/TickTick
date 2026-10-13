@@ -51,11 +51,11 @@ internal fun CalendarMonthView(
 ) {
     val month = YearMonth.from(selected)
     val gridStart = sundayStart(month.atDay(1))
-    val weeks = remember(month) { (ChronoUnit.DAYS.between(gridStart, sundayStart(month.atEndOfMonth())) / 7 + 1).toInt() }
-    val days = remember(month, data) { (0 until weeks * 7).map { data.dayFor(gridStart.plusDays(it.toLong())) } }
+    val weeks = remember(month, gridStart) { (ChronoUnit.DAYS.between(gridStart, sundayStart(month.atEndOfMonth())) / 7 + 1).toInt() }
+    val days = remember(month, gridStart, data) { (0 until weeks * 7).map { data.dayFor(gridStart.plusDays(it.toLong())) } }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(bottom = 2.dp)) {
-            listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEach {
+            com.niranjan.ticktick.core.settings.AppDisplay.weekdayLabels.forEach {
                 Text(it, Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 10.sp, color = TickTickColors.SecondaryText)
             }
         }

@@ -35,6 +35,9 @@ interface TaskDao {
     @Upsert suspend fun putRules(rows: List<FilterRuleEntity>)
     @Upsert suspend fun putMetadata(row: TaskStoreMetadata)
 
+    @Query("DELETE FROM task_lists WHERE id IN (:ids)") suspend fun deleteLists(ids: List<String>)
+    @Query("DELETE FROM task_tags WHERE nameKey IN (:keys)") suspend fun deleteTags(keys: List<String>)
+    @Query("DELETE FROM saved_filters WHERE id IN (:ids)") suspend fun deleteFilters(ids: List<String>)
     @Query("DELETE FROM tasks WHERE id IN (:ids)") suspend fun deleteTasks(ids: List<String>)
     @Query("DELETE FROM task_tag_links WHERE taskId = :id") suspend fun clearLinks(id: String)
     @Query("DELETE FROM task_checklist WHERE taskId = :id") suspend fun clearChecklist(id: String)

@@ -21,6 +21,12 @@ interface TaskRepository {
     suspend fun addList(name: String, color: Int? = null, view: TaskListView = TaskListView.List): String
     suspend fun addTag(name: String, color: Int? = null)
     suspend fun addFilter(name: String, rules: List<FilterRule>, matchAll: Boolean): String
+    suspend fun editList(id: String, name: String, color: Int?, view: TaskListView)
+    suspend fun deleteList(id: String)
+    suspend fun editTag(oldName: String, name: String, color: Int?)
+    suspend fun deleteTag(name: String)
+    suspend fun editFilter(id: String, name: String, rules: List<FilterRule>, matchAll: Boolean)
+    suspend fun deleteFilter(id: String)
     suspend fun deleteTask(id: String, draft: DraftToken? = null, checkpoint: PreferenceCommit? = null)
     suspend fun saveTasks(tasks: List<Task>)
     suspend fun deleteTasks(ids: Set<String>): DeletedTasks
