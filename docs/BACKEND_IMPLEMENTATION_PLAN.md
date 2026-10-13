@@ -375,3 +375,11 @@ Known prior build recipe (recheck local JDK 17 configuration when needed):
 | 2026-09-27 | B6: private attachment copies, reference-based shared ownership and delayed launch-time orphan cleanup | JDK 17 debug APK assembly passed (2m 20s, no Kotlin warnings). The user reports popup delivery works. Attachment device acceptance remains pending; next B7 after that gate. |
 
 For subsequent entries record: milestone/slice, changed paths, decisions, exact checks and outcomes, unresolved risks, and next action. Keep the checkpoint at the top current so a new session does not need to reconstruct the history.
+
+### 2026-10-13 resumed implementation — B7 checkpoint
+
+The earlier October 6 workspace was replaced before its uncommitted changes were pushed. The GitHub baseline remains `80c2158`; this branch reconstructs the recorded work, with remote checkpoints after each bounded increment. Previous build results do not validate this reconstructed source.
+
+B7 implementation now includes Room Focus session/history, migration 5→6, boot-count-aware paused recovery, serialized completion and history-derived totals; Android elapsed-realtime completion alarms, notification deep links and worker recovery; durable notes/configuration/audio choice and explicit save errors. Audio/screen-on remain foreground-only. Same-boot process recovery continues elapsed time; reboot pauses at the last durable checkpoint. Debug assembly is in progress. No unit, instrumentation, emulator or device tests have run under the retained build-only boundary.
+
+Next: record B7 build evidence, then reconstruct B8 export/restore and finish the audited local settings/organization gaps. Runtime acceptance remains pending for all backend milestones.

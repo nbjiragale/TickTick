@@ -30,6 +30,9 @@ class AppContainer(application: Application) {
     val taskRepository: TaskRepository = taskStore
     val reminderRepository: ReminderRepository = taskStore
     val habitRepository: HabitRepository = taskStore.habits
+    val focusRepository: com.niranjan.ticktick.domain.repository.FocusRepository =
+        com.niranjan.ticktick.data.repository.RoomFocusRepository(database, application, applicationScope)
+    val focusController = com.niranjan.ticktick.platform.focus.FocusController(application, focusRepository, applicationScope)
     val sounds = com.niranjan.ticktick.platform.sounds.AppSounds(application, uiStateRepository, habitRepository, applicationScope)
     val reminderController = ReminderController(application, taskRepository, reminderRepository, habitRepository, clock, applicationScope, sounds)
     init {

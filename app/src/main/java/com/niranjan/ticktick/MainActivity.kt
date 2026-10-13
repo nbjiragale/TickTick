@@ -16,6 +16,7 @@ import com.niranjan.ticktick.app.TickTickApplication
 import com.niranjan.ticktick.core.designsystem.TickTickTheme
 
 class MainActivity : ComponentActivity() {
+    private var openFocus by mutableStateOf(false)
     private var reminderRequest by mutableStateOf<ReminderOpenRequest?>(null)
     private val container get() = (application as TickTickApplication).container
 
@@ -28,7 +29,7 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             TickTickTheme {
-                TickTickApp(container, reminderRequest) {
+                TickTickApp(container, reminderRequest, openFocus, { openFocus = false; intent.removeExtra("open_focus") }) {
                     reminderRequest = null
                     intent.removeExtra(EXTRA_PAGE)
                     intent.removeExtra(EXTRA_DELIVERY)
@@ -45,6 +46,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun readReminderIntent(intent: Intent) {
+        openFocus = intent.getBooleanExtra("open_focus", false)
         if (intent.hasExtra(EXTRA_PAGE)) reminderRequest = ReminderOpenRequest(
             intent.getStringExtra(EXTRA_DELIVERY), intent.getLongExtra(EXTRA_REVISION, -1), intent.getStringExtra(EXTRA_PAGE) == "change_date",
             habitSummary = intent.getStringExtra(EXTRA_PAGE) == "habit_summary")
