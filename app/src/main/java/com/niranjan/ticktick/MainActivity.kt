@@ -2,6 +2,9 @@ package com.niranjan.ticktick
 
 import android.graphics.Color
 import android.os.Bundle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.drop
 import android.content.Intent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -21,12 +24,17 @@ class MainActivity : ComponentActivity() {
     private val container get() = (application as TickTickApplication).container
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+        val fresh = intent.getBooleanExtra("fresh_restore", false)
+        intent.removeExtra("fresh_restore")
+        super.onCreate(if (fresh) null else savedInstanceState)
         if (savedInstanceState?.getBoolean("reminderRequestHandled") != true) readReminderIntent(intent)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
+        lifecycleScope.launch { container.restoreEpoch.drop(1).collect {
+            viewModelStore.clear(); intent.putExtra("fresh_restore", true); recreate()
+        } }
         setContent {
             TickTickTheme {
                 TickTickApp(container, reminderRequest, openFocus, { openFocus = false; intent.removeExtra("open_focus") }) {

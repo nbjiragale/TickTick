@@ -141,6 +141,10 @@ internal class ReminderPlatform(private val context: Context, private val sounds
         alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), intent)
     }
 
+    fun cancelForRestore(ids: List<String>) {
+        ids.forEach { id -> alarms.cancel(broadcast(id, 0, "alarm")); notifications.cancel(id, 1) }
+        resumeAt(null)
+    }
     fun resumeAt(at: Instant?) = schedule(at, broadcast("resume", 0, "reconcile"))
 
     fun apply(effect: ReminderEffect, foreground: Boolean): Boolean {

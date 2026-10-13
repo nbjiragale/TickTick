@@ -100,6 +100,22 @@ private enum class AppTab(val label: String, val symbol: AppSymbol) {
 
 @Composable
 fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.platform.reminders.ReminderOpenRequest? = null, openFocus: Boolean = false, onFocusOpened: () -> Unit = {}, onReminderRequestHandled: () -> Unit = {}) {
+    val restoring by container.backupManager.restoring.collectAsStateWithLifecycle()
+    if (restoring) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                androidx.compose.material3.CircularProgressIndicator()
+                Text("Restoring saved data…")
+            }
+        }
+        return
+    }
+    val restoreOutcome by container.backupManager.outcome.collectAsStateWithLifecycle()
+    restoreOutcome?.let { message ->
+        androidx.compose.material3.AlertDialog(onDismissRequest = { container.backupManager.outcome.value = null },
+            text = { Text(message) }, confirmButton = { androidx.compose.material3.TextButton(
+                onClick = { container.backupManager.outcome.value = null }) { Text("OK") } })
+    }
     val storeState by container.taskRepository.storeState.collectAsStateWithLifecycle()
     val uiStoreState by container.uiStateRepository.storeState.collectAsStateWithLifecycle()
     val focusStoreState by container.focusRepository.storeState.collectAsStateWithLifecycle()
@@ -393,6 +409,7 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
         "groupSort" -> TaskGroupSortSheet(state.presentation, viewModel::updatePresentation) { taskOptionsSheet = null }
     }
     AppOverlays(
+        backupManager = container.backupManager,
         sounds = container.sounds,
         overlay = overlay, state = state, viewModel = viewModel, reminderController = container.reminderController,
         onDismiss = { overlay = null },

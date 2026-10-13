@@ -32,10 +32,25 @@ class AppContainer(application: Application) {
     val habitRepository: HabitRepository = taskStore.habits
     val focusRepository: com.niranjan.ticktick.domain.repository.FocusRepository =
         com.niranjan.ticktick.data.repository.RoomFocusRepository(database, application, applicationScope)
-    val focusController = com.niranjan.ticktick.platform.focus.FocusController(application, focusRepository, applicationScope)
+    val focusController = com.niranjan.ticktick.platform.focus.FocusController(application, focusRepository, applicationScope) { database.restoring.value }
     val sounds = com.niranjan.ticktick.platform.sounds.AppSounds(application, uiStateRepository, habitRepository, applicationScope)
     val reminderController = ReminderController(application, taskRepository, reminderRepository, habitRepository, clock, applicationScope, sounds)
+    val restoreEpoch = kotlinx.coroutines.flow.MutableStateFlow(0L)
+    val backupManager = com.niranjan.ticktick.platform.backup.BackupManager(application, database, uiStateRepository,
+        beforeReplace = { reminderController.cancelForRestore(database.reminders().deliveries().map { it.id }) },
+        afterReplace = { replaced ->
+            if (replaced) {
+                taskStore.reloadAfterRestore()
+                (uiStateRepository as com.niranjan.ticktick.data.repository.RoomUiStateRepository).reloadAfterRestore()
+                (focusRepository as com.niranjan.ticktick.data.repository.RoomFocusRepository).reloadAfterRestore()
+                restoreEpoch.value += 1
+            }
+            reminderController.requestReconcile(force = true)
+        })
     init {
+        applicationScope.launch {
+            database.restoring.collect { if (!it) { reminderController.requestReconcile(force = true); focusController.retry() } }
+        }
         taskStore.onReminderChange = { reminderController.requestReconcile() }
         taskStore.onCompletion = sounds::play
         applicationScope.launch {
@@ -43,8 +58,9 @@ class AppContainer(application: Application) {
                 tasks == TaskStoreState.Ready && drafts == TaskStoreState.Ready
             }.first { it }
             runCatching {
+                val recoveryReferences = backupManager.recoveryAttachmentUris() ?: return@runCatching
                 ManagedAttachmentStore(application).cleanOldOrphans(
-                    taskRepository.snapshot.value.tasks.flatMap { task -> task.attachments.map { it.uri } },
+                    taskRepository.snapshot.value.tasks.flatMap { task -> task.attachments.map { it.uri } } + recoveryReferences,
                     uiStateRepository.currentDraft("task")?.payload,
                 )
             }

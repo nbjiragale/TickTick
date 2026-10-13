@@ -4,6 +4,7 @@ import com.niranjan.ticktick.domain.model.*
 import com.niranjan.ticktick.domain.repository.*
 import java.time.Clock
 import java.time.Instant
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -23,7 +24,7 @@ import kotlinx.coroutines.withContext
 
 class RoomTaskRepository(private val database: TickTickDatabase, private val clock: Clock,
     private val scope: CoroutineScope) : TaskRepository, ReminderRepository {
-    private val mutex = Mutex()
+    private val mutex = database.operationLock
     private val reminders = ReminderStore(database.reminders(), clock)
     private val reminderData = MutableStateFlow(ReminderState())
     override val reminderState = reminderData.asStateFlow()
@@ -50,6 +51,12 @@ class RoomTaskRepository(private val database: TickTickDatabase, private val clo
 
     init { retryLoad() }
 
+    suspend fun reloadAfterRestore() {
+        loading?.cancel(); loading?.join(); loading = null
+        status.value = TaskStoreState.Loading
+        retryLoad()
+        check(storeState.first { it != TaskStoreState.Loading } == TaskStoreState.Ready)
+    }
     override fun retryLoad() {
         if (loading?.isActive == true) return
         loading = scope.launch {
@@ -90,7 +97,7 @@ class RoomTaskRepository(private val database: TickTickDatabase, private val clo
         }
     }
 
-    private suspend fun <T> mutate(draft: DraftToken? = null, checkpoint: PreferenceCommit? = null, action: TaskMutation.() -> T): T = mutex.withLock {
+    private suspend fun <T> mutate(draft: DraftToken? = null, checkpoint: PreferenceCommit? = null, action: TaskMutation.() -> T): T = database.writeLocked {
         check(status.value == TaskStoreState.Ready) { "Task storage is not ready." }
         // Once a transaction starts, finish commit and publish its result even if a screen closes.
         // This prevents a committed write being reported as cancelled before acknowledgement.
@@ -118,7 +125,7 @@ class RoomTaskRepository(private val database: TickTickDatabase, private val clo
     }
 
     private suspend fun <T> reminderTransaction(notify: Boolean = true,
-        operation: suspend (TaskSnapshot) -> T): T = mutex.withLock {
+        operation: suspend (TaskSnapshot) -> T): T = database.writeLocked {
         check(status.value == TaskStoreState.Ready)
         withContext(NonCancellable) {
             val (result, saved) = database.withTransaction {
@@ -135,7 +142,7 @@ class RoomTaskRepository(private val database: TickTickDatabase, private val clo
         }
     }
 
-    private suspend fun <T> mutateHabit(draft: DraftToken? = null, action: HabitMutation.() -> T): T = mutex.withLock {
+    private suspend fun <T> mutateHabit(draft: DraftToken? = null, action: HabitMutation.() -> T): T = database.writeLocked {
         check(status.value == TaskStoreState.Ready)
         withContext(NonCancellable) {
             var completed = false
@@ -169,6 +176,7 @@ class RoomTaskRepository(private val database: TickTickDatabase, private val clo
     override suspend fun reconcileReminders(force: Boolean) = reminderTransaction(notify = false) { reminders.reconcile(it, force, database.habits().readHabits()) }
     override suspend fun applyReminderEffect(id: String, revision: Long, apply: () -> Boolean): Boolean = mutex.withLock {
         withContext(NonCancellable) {
+            if (database.restoring.value) return@withContext false
             val current = database.reminders().delivery(id)
             if (current == null || current.revision != revision || !current.dirty) true
             else if (apply()) {

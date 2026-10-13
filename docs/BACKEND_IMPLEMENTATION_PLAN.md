@@ -4,17 +4,15 @@ Created: 2026-09-16. Scope: the offline Android backend in this repository.
 
 ## Session checkpoint
 
-**Current state (2026-09-27):** The user reports that popup delivery is working properly on their device after the B2/B4 repair. Detailed device/OS/action-matrix evidence remains unrecorded. B6 now copies new attachments into app-private storage and uses saved task/draft URI references for launch-time orphan cleanup. Its debug build passed; device acceptance remains pending. B1-B5 remain implemented with broader validation pending. Schema remains 5.
+**Current state (2026-10-13):** B1–B8 are implemented with runtime acceptance pending. Schema 6 adds durable Focus session/history. Local JSON export/restore validates through a staging database, preserves a pre-restore recovery copy and replaces data atomically. The resumed implementation is checkpointed on `codex/complete-offline-app` in draft PR #1.
 
-**Next action:** install the B6 debug APK and verify an imported image, audio file and document after restart. Check failed imports, cancelled drafts, Duplicate, Delete/Undo and eventual orphan cleanup on a device. Record the user's popup device/OS details and the still-pending sound/action matrix separately. After B6 device acceptance, begin B7 Focus persistence.
+**Next action:** complete persistent app preferences and organization edit/delete workflows, then assemble debug and release variants and update the audit. Device acceptance follows the checklist in `IMPLEMENTATION_AUDIT.md` when authorized.
 
-**Current milestone:** B6 attachment ownership and recovery implemented; debug assembly passed and runtime validation pending. B0 complete; B1-B5 implemented with validation pending; B7-B9 not started.
+**Current milestone:** B9 production wiring in progress. Existing explicit feature exclusions remain unchanged.
 
-**Blockers:** no implementation blocker. Android channel overrides, phone volume, silent mode, Do Not Disturb and popup access remain authoritative. The agent's build-only verification boundary remains in effect.
+**Blockers:** no implementation blocker. Android notification/channel/DND settings remain authoritative. The build-only verification restriction remains active.
 
-**Working tree:** substantial pre-existing UI/source/reference changes are the baseline. Do not reset, clean, or overwrite them.
-
-**Validation this session:** B6 JDK 17 debug assembly passed in 2m 20s (5 executed, 33 up-to-date), with no Kotlin warnings. Command: `:app:assembleDebug -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain`. APK: `app/build/outputs/apk/debug/app-debug.apk`; log: `build/attachment-b6-build.log`. No unit, instrumentation, emulator or device tests were run under the current build-only restriction. The user reports popup behavior works on their device.
+**Validation:** JDK 21 debug assembly passed on the reconstructed B7/B8 sources in 1m 37s (29 executed, 9 up-to-date). Command: `:app:assembleDebug -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain`. APK: `app/build/outputs/apk/debug/app-debug.apk`; session log `/tmp/backup-build.log`. No unit, instrumentation, emulator or device tests run. The earlier user report that popup delivery works is retained, without claiming broader device acceptance.
 
 **Scope decisions:** the user authorized implementation after the planning request. Use the existing offline/local product architecture. No server, account system, cloud sync, subscriptions, or network API is needed for V1. Backend implementation proceeds ahead of unfinished UI acceptance; it does not mark the UI gate complete.
 
@@ -100,8 +98,8 @@ Statuses: **Not started**, **In progress**, **Implemented; validation pending**,
 | B5 | Durable preferences, drafts and remaining view integration | B1; B3/B4 for occurrences | Implemented, including four sound preferences; validation pending |
 | B6 | Attachment ownership and recovery | B1, B5 | Implemented; validation pending |
 | B7 | Durable Focus sessions and completion | B1, B2, B5 | Not started |
-| B8 | Local export/restore and maintenance | B3-B7 | Not started |
-| B9 | Production wiring and reliability acceptance | B1-B8 | Not started |
+| B8 | Local export/restore and maintenance | B3-B7 | Implemented; validation pending |
+| B9 | Production wiring and reliability acceptance | B1-B8 | In progress |
 
 ### B1 — Room foundation and durable tasks
 
@@ -383,3 +381,9 @@ The earlier October 6 workspace was replaced before its uncommitted changes were
 B7 implementation now includes Room Focus session/history, migration 5→6, boot-count-aware paused recovery, serialized completion and history-derived totals; Android elapsed-realtime completion alarms, notification deep links and worker recovery; durable notes/configuration/audio choice and explicit save errors. Audio/screen-on remain foreground-only. Same-boot process recovery continues elapsed time; reboot pauses at the last durable checkpoint. Debug assembly is in progress. No unit, instrumentation, emulator or device tests have run under the retained build-only boundary.
 
 Next: record B7 build evidence, then reconstruct B8 export/restore and finish the audited local settings/organization gaps. Runtime acceptance remains pending for all backend milestones.
+
+### B8 implementation checkpoint — 2026-10-13
+
+`platform/backup/BackupManager.kt` snapshots all Room tables in a transaction, bounds imports to 32 MiB/100,000 records, validates schema/columns/types/foreign keys and domain values in a separate in-memory database, and previews record counts and unavailable attachments. Restore saves a synced pre-restore JSON copy before atomically replacing rows. Imported running Focus sessions pause, revisions advance, old reminder alarms cancel and current repositories reload. Shared database serialization and a generation guard prevent queued old draft writes from returning after restore. UI displays durable restore outcomes across activity recreation. Recovery-copy attachment references are retained by cleanup. Android auto-backup excludes the database and private files; the app's explicit JSON workflow documents that media bytes/provider grants are excluded.
+
+Changed areas: backup/settings UI, Room repository write coordination/reload, application/activity reset, reminder cancellation, backup XML, Room schema 6 export. Debug assembly passed; runtime rollback, migration, stale-action and document-provider acceptance remain pending.

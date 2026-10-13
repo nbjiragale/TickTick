@@ -67,6 +67,7 @@ class ReminderController(private val context: Context, private val tasks: TaskRe
         }
     }
 
+    fun cancelForRestore(ids: List<String>) = platform.cancelForRestore(ids)
     fun requestReconcile(force: Boolean = false) {
         if (force) forceRequested.set(true)
         requests.trySend(Unit)

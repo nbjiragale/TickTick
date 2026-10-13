@@ -18,7 +18,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.TimeUnit
 
-class FocusController(private val context: Context, private val repository: FocusRepository, private val scope: CoroutineScope) {
+class FocusController(private val context: Context, private val repository: FocusRepository, private val scope: CoroutineScope, private val restoring: () -> Boolean = { false }) {
     private val lock = Mutex()
     private val alarms = context.getSystemService(AlarmManager::class.java)
     private val pending get() = PendingIntent.getBroadcast(context, 401,
@@ -46,10 +46,12 @@ class FocusController(private val context: Context, private val repository: Focu
         catch (_: Exception) { error.value = "Focus completion needs rescheduling. Tap Retry." }
     } }
     suspend fun reconcile() {
+        if (restoring()) return
         check(repository.storeState.first { it != TaskStoreState.Loading } == TaskStoreState.Ready)
         repository.reconcile(); apply()
     }
     private suspend fun apply() = lock.withLock {
+        if (restoring()) return@withLock
         val value = repository.session.value
         alarms.cancel(pending)
         if (value.phase == FocusPhase.Running && value.mode == FocusMode.Pomo) {
