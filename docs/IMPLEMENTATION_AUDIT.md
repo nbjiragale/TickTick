@@ -29,3 +29,7 @@ The repository's build-only restriction remains active. None of the following is
 ## Explicitly deferred product scope
 
 Templates, Quick Add Settings, Suggested Tasks, task Manage Section/View Options/Share and the removed sidebar management route remain excluded by existing references. Timeline layout, in-app audio recording/automatic document scan, real widget installation, remote calendar integrations, accounts/cloud sync, transferable media archives and background Focus audio are not implemented. Production holidays remain unconfigured. Focus audio and keep-screen-on apply while the Focus screen is active.
+
+## Build evidence
+
+Source commit `6db870c` passed debug and unsigned release assembly with JDK 21, including release lint-vital checks (6m 18s; 55 executed, 33 up-to-date). No Kotlin warnings; a non-fatal lint analytics warning came from the sandbox's unwritable home directory. Local log: `build/offline-completion-build.log` (ignored). [CI build and APK artifacts](https://github.com/nbjiragale/TickTick/actions/runs/38350214840) passed on the same source. All 22 schema-5 tables are unchanged in the schema-6 export; the two Focus migration CREATE statements match Room's generated SQL. These are build/static checks only; the acceptance list above remains pending.

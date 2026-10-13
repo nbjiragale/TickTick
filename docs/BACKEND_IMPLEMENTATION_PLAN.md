@@ -6,13 +6,13 @@ Created: 2026-09-16. Scope: the offline Android backend in this repository.
 
 **Current state (2026-10-13):** B1–B8 are implemented with runtime acceptance pending. Schema 6 adds durable Focus session/history. Local JSON export/restore validates through a staging database, preserves a pre-restore recovery copy and replaces data atomically. The resumed implementation is checkpointed on `codex/complete-offline-app` in draft PR #1.
 
-**Next action:** complete persistent app preferences and organization edit/delete workflows, then assemble debug and release variants and update the audit. Device acceptance follows the checklist in `IMPLEMENTATION_AUDIT.md` when authorized.
+**Next action:** review [draft PR #1](https://github.com/nbjiragale/TickTick/pull/1). When device verification is authorized, install the debug APK and execute the prioritized acceptance checklist in `IMPLEMENTATION_AUDIT.md`, beginning with upgrade, backup/restore and Focus recovery.
 
-**Current milestone:** B9 production wiring in progress. Existing explicit feature exclusions remain unchanged.
+**Current milestone:** B9 production wiring implemented; debug/release builds and CI passed, device acceptance pending. Existing explicit feature exclusions remain unchanged.
 
 **Blockers:** no implementation blocker. Android notification/channel/DND settings remain authoritative. The build-only verification restriction remains active.
 
-**Validation:** JDK 21 debug assembly passed on the reconstructed B7/B8 sources in 1m 37s (29 executed, 9 up-to-date). Command: `:app:assembleDebug -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain`. APK: `app/build/outputs/apk/debug/app-debug.apk`; session log `/tmp/backup-build.log`. No unit, instrumentation, emulator or device tests run. The earlier user report that popup delivery works is retained, without claiming broader device acceptance.
+**Validation:** final source commit `6db870c` passed JDK 21 `:app:assembleDebug :app:assembleRelease -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain` in 6m 18s (55 executed, 33 up-to-date), including release lint-vital checks. Log: `build/offline-completion-build.log` (local, ignored). APKs: `app/build/outputs/apk/debug/app-debug.apk` and `app/build/outputs/apk/release/app-release-unsigned.apk`. No Kotlin warnings; one non-fatal lint analytics warning concerned the sandbox's unwritable home directory. [GitHub CI passed and uploaded APKs](https://github.com/nbjiragale/TickTick/actions/runs/38350214840). Static schema comparison preserved all 22 schema-5 tables and matched both new migration CREATE statements to Room's export. No unit, instrumentation, emulator or device tests ran. The earlier user's popup success report remains distinct from the pending broader acceptance matrix. No merge or release publication performed.
 
 **Scope decisions:** the user authorized implementation after the planning request. Use the existing offline/local product architecture. No server, account system, cloud sync, subscriptions, or network API is needed for V1. Backend implementation proceeds ahead of unfinished UI acceptance; it does not mark the UI gate complete.
 
@@ -99,7 +99,7 @@ Statuses: **Not started**, **In progress**, **Implemented; validation pending**,
 | B6 | Attachment ownership and recovery | B1, B5 | Implemented; validation pending |
 | B7 | Durable Focus sessions and completion | B1, B2, B5 | Implemented; validation pending |
 | B8 | Local export/restore and maintenance | B3-B7 | Implemented; validation pending |
-| B9 | Production wiring and reliability acceptance | B1-B8 | In progress |
+| B9 | Production wiring and reliability acceptance | B1-B8 | Implemented; validation pending |
 
 ### B1 — Room foundation and durable tasks
 
@@ -399,3 +399,7 @@ Changed areas: domain repository and mutation coordinator, DAO/mapper, organizat
 ### Reliability follow-up — 2026-10-13
 
 Restore advances saved draft revision baselines together with task/habit revisions, preserving true conflicts without making every restored edit stale. The activity resets even if post-commit reload fails. Filter writes reject removed list conditions. Static schema comparison confirms all 22 schema-5 tables remain unchanged; schema 6 adds only Focus session/history. The first CI run stopped in SDK setup because the action's default `tools` package is retired; the workflow now selects current command-line tools and `platform-tools` explicitly. Final debug/release assembly and rerun CI are in progress.
+
+### Final delivery checkpoint — 2026-10-13
+
+Implemented and pushed: Focus (`92a871b`), backup/restore (`01009c7`), local settings/organization/feedback/build workflow (`c43b025`), and restore/filter/CI reliability fixes (`6db870c`). All implementation changes are reviewable in PR #1. Final local debug/release assembly and CI passed as recorded above. Documentation-only follow-up records this evidence; device/runtime and screenshot acceptance remain pending, with explicit deferred product features listed in the audit.
