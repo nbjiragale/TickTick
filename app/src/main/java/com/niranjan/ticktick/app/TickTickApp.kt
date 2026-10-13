@@ -116,10 +116,11 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
             text = { Text(message) }, confirmButton = { androidx.compose.material3.TextButton(
                 onClick = { container.backupManager.outcome.value = null }) { Text("OK") } })
     }
+    val startupReady by container.startupReady.collectAsStateWithLifecycle()
     val storeState by container.taskRepository.storeState.collectAsStateWithLifecycle()
     val uiStoreState by container.uiStateRepository.storeState.collectAsStateWithLifecycle()
     val focusStoreState by container.focusRepository.storeState.collectAsStateWithLifecycle()
-    if (focusStoreState != com.niranjan.ticktick.domain.repository.TaskStoreState.Ready || storeState != com.niranjan.ticktick.domain.repository.TaskStoreState.Ready || uiStoreState != com.niranjan.ticktick.domain.repository.TaskStoreState.Ready) {
+    if (!startupReady || focusStoreState != com.niranjan.ticktick.domain.repository.TaskStoreState.Ready || storeState != com.niranjan.ticktick.domain.repository.TaskStoreState.Ready || uiStoreState != com.niranjan.ticktick.domain.repository.TaskStoreState.Ready) {
         Box(Modifier.fillMaxSize().background(TickTickColors.Background), contentAlignment = Alignment.Center) {
             Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 val failure = (focusStoreState as? com.niranjan.ticktick.domain.repository.TaskStoreState.Failed)

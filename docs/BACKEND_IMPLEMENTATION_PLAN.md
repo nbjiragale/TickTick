@@ -4,15 +4,15 @@ Created: 2026-09-16. Scope: the offline Android backend in this repository.
 
 ## Session checkpoint
 
-**Current state (2026-10-13):** B1–B9 implementation is pushed in draft PR #1 with device acceptance pending. Habit multiple-time delivery now retains later selected times after daily completion and handles subsequent foreground popups while an earlier log remains open. No schema change; schema remains 6.
+**Current state (2026-10-13):** Existing-feature correctness review complete at source level; five defects corrected without adding features. Fixes cover stale destinations, tag/list-token corruption, backup limits, attachment cleanup races and planning save races. B1–B9 remain implemented with device acceptance pending; schema remains 6. See `EXISTING_FEATURE_REVIEW.md` for full coverage and findings.
 
-**Next action:** review the habit multiple-time correction in [draft PR #1](https://github.com/nbjiragale/TickTick/pull/1). When device checks are authorized, verify three selected times after dismiss/partial/full check-in, with the first log left open, then background/restart behavior. The wider acceptance checklist remains in `IMPLEMENTATION_AUDIT.md`.
+**Next action:** review the fixes in [draft PR #1](https://github.com/nbjiragale/TickTick/pull/1). The remaining priority is device acceptance of existing behavior: multiple-time reminders, restart/restore recovery, attachment Delete/Undo and rapid edits/actions. No new feature development is proposed. The build-only restriction remains in effect.
 
 **Current milestone:** B9 production wiring implemented; debug/release builds and CI passed, device acceptance pending. Existing explicit feature exclusions remain unchanged.
 
 **Blockers:** no implementation blocker. Android notification/channel/DND settings remain authoritative. The build-only verification restriction remains active.
 
-**Latest validation:** habit reminder correction passed JDK 21 debug and release assembly, including release lint-vital checks, in 3m 31s. Command: `:app:assembleDebug :app:assembleRelease -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain`. Log: `build/habit-multiple-times-build.log` (local, ignored). No Kotlin warnings, unit/instrumentation/emulator/device tests. Source tracing establishes the suppression paths; this does not establish delivery on the user's phone.
+**Latest validation:** existing-feature review fixes passed JDK 21 debug/release assembly and release lint-vital checks in 3m 52s (16 executed, 72 up-to-date). Command: `:app:assembleDebug :app:assembleRelease -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain`. Log: `build/existing-features-review-build.log` (local, ignored). No Kotlin warnings; one non-fatal lint analytics warning concerns the sandbox's unwritable home directory. `git diff --check` passed. No unit, instrumentation, emulator or device tests ran; source/build verification is not runtime acceptance.
 
 **Previous validation:** final source commit `6db870c` passed JDK 21 `:app:assembleDebug :app:assembleRelease -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain` in 6m 18s (55 executed, 33 up-to-date), including release lint-vital checks. Log: `build/offline-completion-build.log` (local, ignored). APKs: `app/build/outputs/apk/debug/app-debug.apk` and `app/build/outputs/apk/release/app-release-unsigned.apk`. No Kotlin warnings; one non-fatal lint analytics warning concerned the sandbox's unwritable home directory. [GitHub CI passed and uploaded APKs](https://github.com/nbjiragale/TickTick/actions/runs/38350214840). Static schema comparison preserved all 22 schema-5 tables and matched both new migration CREATE statements to Room's export. No unit, instrumentation, emulator or device tests ran. The earlier user's popup success report remains distinct from the pending broader acceptance matrix. No merge or release publication performed.
 
@@ -415,3 +415,11 @@ The implementation now retains later selected times after daily completion, stop
 Changed files: `domain/model/HabitReminder.kt`, `data/repository/ReminderStore.kt`, `data/repository/RoomTaskRepository.kt`, `app/TickTickApp.kt`; habit reference/audit/tracker documentation. Pending device checks include dismiss/partial/full check-in at the first of three times, leaving the first log open or switching tabs, background/lock-screen delivery, process restart, constant repeats, stale Check in, archive/Undo and goal boundaries. Build-only validation remains in effect.
 
 **Habit correction build result:** debug and unsigned release APK assembly passed in 3m 31s; `git diff --check` passed. Device validation remains pending.
+
+### Existing-feature correctness review — 2026-10-13
+
+The user redirected work to validating existing features rather than adding features. Reviewed task editing/drafts/NLP/checklists and batch actions, organization/search, recurrence/schedules, calendar projections/actions, Plan Your Day, habits/goals, reminders, Focus, settings/media, and backup/restore. Detailed source coverage, concrete triggers and remaining device cases are recorded in `EXISTING_FEATURE_REVIEW.md`.
+
+Fixed five established source-level issues: stale saved navigation destinations now resolve to the real Inbox; tag edits preserve tag-looking text inside list tokens; backup export/recovery apply restore's record/field/byte limits; startup attachment cleanup finishes before UI Delete/Undo or restore and reads committed ownership under the write lock; planning menu actions cannot persist older review state while a task/checkpoint action commits. Backup validation failures display an actionable explanation. No product feature, schema or dependency added.
+
+Changed implementation: `app/AppContainer.kt`, `app/TickTickApp.kt`, `data/repository/TaskMutation.kt`, `feature/tasks/TasksViewModel.kt`, `feature/planning/PlanYourDayViewModel.kt`, `platform/backup/BackupManager.kt`, `feature/settings/BackupSettings.kt`. Debug/release assembly and release lint-vital checks passed in 3m 52s; no runtime acceptance is claimed.

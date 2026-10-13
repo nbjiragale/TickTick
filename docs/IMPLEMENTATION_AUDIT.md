@@ -39,3 +39,7 @@ Source commit `6db870c` passed debug and unsigned release assembly with JDK 21, 
 Code review found that completing a habit removed its entire day's reminder projection, suppressing later selected times. A separate foreground `autoHabitOpen` gate also suppressed later automatic logs while the platform intentionally hid foreground popup notifications. The correction retains completed-day scheduled times and handles each new committed delivery. Per-time alarm identities already existed and remain unchanged. Delivery labels now use each row's actual scheduled time. Completed-day notifications omit quick Check in; stale actions only dismiss.
 
 Pending device checks: three spaced times (for example 09:00, 13:00, 18:00); dismiss first; partial check-in; complete daily target at first time; keep the first log open; switch tabs without closing it; second habit arriving while first is open; background/locked device; restart between times; Constant Reminder on/off; denied exact-alarm access; archive/Undo and weekly/finite goals. Verify future times remain while already missed or dismissed times do not replay. No runtime checks have been executed.
+
+## Existing-feature review follow-up — 2026-10-13
+
+The user requested correctness work instead of new features. See [existing feature review](EXISTING_FEATURE_REVIEW.md) for coverage across all current feature groups, five corrected source-level defects, concrete triggers and the remaining device checks. No new product features or schema changes were added.

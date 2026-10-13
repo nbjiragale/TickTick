@@ -37,6 +37,8 @@ class BackupManager(private val context: Context, private val database: TickTick
         "reminder_occurrences", "reminder_deliveries", "reminder_preferences", "habit_sections", "habit_settings", "habits",
         "habit_schedule_history", "habit_checkins", "ui_preferences", "editor_drafts", "focus_session", "focus_history")
     private val maxBytes = 32 * 1024 * 1024
+    private val maxRows = 100_000
+    private val maxFieldLength = 1_000_000
     private fun mediaUris(content: JSONObject): Set<String> {
         val media = content.getJSONArray("task_attachments")
         val result = (0 until media.length()).map { media.getJSONObject(it).getString("uri") }.toMutableSet()
@@ -168,6 +170,7 @@ class BackupManager(private val context: Context, private val database: TickTick
                 database.operationLock.withLock {
                     restoring.value = true
                     val old = database.withTransaction { snapshot(database.openHelper.writableDatabase).toString() }
+                    require(old.toByteArray(Charsets.UTF_8).size <= maxBytes) { "The recovery backup exceeds the 32 MB restore limit. Current data was not replaced." }
                     val temporary = File(context.noBackupFilesDir, "before-restore.tmp")
                     temporary.outputStream().use { stream -> stream.write(old.toByteArray(Charsets.UTF_8)); stream.fd.sync() }
                     check(temporary.renameTo(recoveryFile)) { "Couldn't save the recovery backup. Current data was not replaced." }
@@ -220,14 +223,18 @@ class BackupManager(private val context: Context, private val database: TickTick
     }
     private fun snapshot(sql: SupportSQLiteDatabase): JSONObject {
         val content = JSONObject()
+        var total = 0
         tables.forEach { table ->
             val rows = JSONArray()
             sql.query("SELECT * FROM `$table`").use { cursor -> while (cursor.moveToNext()) {
+                require(++total <= maxRows) { "Backup exceeds the 100,000-record restore limit." }
                 val row = JSONObject()
                 cursor.columnNames.forEachIndexed { i, name -> row.put(name, when (cursor.getType(i)) {
                     android.database.Cursor.FIELD_TYPE_NULL -> JSONObject.NULL
                     android.database.Cursor.FIELD_TYPE_INTEGER -> cursor.getLong(i)
-                    android.database.Cursor.FIELD_TYPE_STRING -> cursor.getString(i)
+                    android.database.Cursor.FIELD_TYPE_STRING -> cursor.getString(i).also {
+                        require(it.length <= maxFieldLength) { "A saved field exceeds the backup restore limit." }
+                    }
                     else -> error("Unsupported backup field.")
                 }) }
                 if (table == "focus_session") {
@@ -254,7 +261,7 @@ class BackupManager(private val context: Context, private val database: TickTick
                 columns[cursor.getString(cursor.getColumnIndexOrThrow("name"))] = cursor.getString(cursor.getColumnIndexOrThrow("type"))
             } }
             val rows = content.getJSONArray(table)
-            total += rows.length(); require(total <= 100_000) { "Backup contains too many records." }
+            total += rows.length(); require(total <= maxRows) { "Backup contains too many records." }
             val singleton = table in setOf("task_store_metadata", "reminder_preferences", "habit_settings", "focus_session")
             require(!singleton || rows.length() <= 1)
             for (i in 0 until rows.length()) {
@@ -271,7 +278,7 @@ class BackupManager(private val context: Context, private val database: TickTick
                             if (key in booleans) require(number in 0..1)
                             number
                         }
-                        type == "TEXT" -> { require(value is String && value.length <= 1_000_000); value }
+                        type == "TEXT" -> { require(value is String && value.length <= maxFieldLength); value }
                         else -> error("Unsupported field type.")
                     }
                 }.toTypedArray<Any?>()

@@ -203,6 +203,19 @@ internal class TaskMutation(initial: TaskSnapshot, private val clock: Clock = Cl
         }
     }
     private fun tagPattern(name: String) = Regex("(?<![\\p{L}\\p{N}_])#${Regex.escape(name)}(?![\\p{L}\\p{N}_-])", RegexOption.IGNORE_CASE)
+    private fun replaceTagInTitle(task: Task, current: TaskSnapshot, name: String, replacement: String): String {
+        // List names can contain #tag-looking text. Those characters belong to the
+        // list token, not the task's tags; keep source offsets while masking them.
+        val source = task.title.toCharArray()
+        current.lists.find { it.id == task.listId }?.let { list ->
+            Regex("(?<!\\S)${Regex.escape(listToken(list))}(?!\\S)").findAll(task.title).forEach { token ->
+                token.range.forEach { source[it] = ' ' }
+            }
+        }
+        return tagPattern(name).findAll(source.concatToString()).toList().asReversed()
+            .fold(task.title) { text, match -> text.replaceRange(match.range, replacement) }
+    }
+
     fun editTag(oldName: String, name: String, color: Int?) {
         val trimmed = name.trim().removePrefix("#")
         require(Regex("[\\p{L}\\p{N}_-]+").matches(trimmed)) { "Use letters, numbers, underscores or hyphens." }
@@ -213,7 +226,7 @@ internal class TaskMutation(initial: TaskSnapshot, private val clock: Clock = Cl
                 tasks = current.tasks.map { task ->
                     if (task.tags.none { it.equals(oldName, true) }) task else task.copy(
                         tags = task.tags.map { if (it.equals(oldName, true)) trimmed else it },
-                        title = tagPattern(oldName).replace(task.title) { "#$trimmed" },
+                        title = replaceTagInTitle(task, current, oldName, "#$trimmed"),
                         modifiedAt = clock.instant(), revision = task.revision + 1)
                 }, filters = current.filters.map { filter -> filter.copy(rules = filter.rules.map {
                     if (it.field == FilterField.Tag && it.value.equals(oldName, true)) it.copy(value = trimmed) else it
@@ -226,7 +239,7 @@ internal class TaskMutation(initial: TaskSnapshot, private val clock: Clock = Cl
             current.copy(tags = current.tags.filterNot { it.name.equals(name, true) }, tasks = current.tasks.map { task ->
                 if (task.tags.none { it.equals(name, true) }) task else task.copy(
                     tags = task.tags.filterNot { it.equals(name, true) },
-                    title = tagPattern(name).replace(task.title, "").trim().ifBlank { name },
+                    title = replaceTagInTitle(task, current, name, "").trim().ifBlank { name },
                     modifiedAt = clock.instant(), revision = task.revision + 1)
             })
         }

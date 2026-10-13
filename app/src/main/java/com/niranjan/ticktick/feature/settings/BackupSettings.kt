@@ -24,7 +24,10 @@ fun BackupSettings(manager: BackupManager) {
         scope.launch {
             try { action() }
             catch (e: CancellationException) { throw e }
-            catch (_: Exception) { message = "Backup operation failed. Check the file and available storage, then retry." }
+            catch (e: Exception) {
+                message = if (e is IllegalArgumentException) e.message ?: "The backup is invalid or exceeds a supported limit."
+                    else "Backup operation failed. Check the file and available storage, then retry."
+            }
             finally { busy = false }
         }
     }

@@ -70,14 +70,16 @@ class TasksViewModel(
     private val dailyPreferences = combine(date, reminders.reminderState) { today, reminder -> today to reminder.pause.resumeDate }
 
     val uiState = combine(repository.snapshot, selection, preferences.snapshot, dailyPreferences) { snapshot, selected, stored, daily ->
-        val options = taskPresentation(stored.preferences["tasks:${selected.first}"], defaultPresentation(selected.first))
-        makeState(snapshot, selected.first, options.showCompleted, daily.first.first, selected.second, options)
+        val destination = resolveSelection(snapshot, selected.first)
+        val options = taskPresentation(stored.preferences["tasks:$destination"], defaultPresentation(destination))
+        makeState(snapshot, destination, options.showCompleted, daily.first.first, selected.second, options)
             .withAlertPause(daily.second).copy(calendarShowCompleted = stored.preferences["calendar"]?.let(::JSONObject)?.optBoolean("showCompleted") ?: false)
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
-        taskPresentation(preferences.snapshot.value.preferences["tasks:${selectedList.value}"], defaultPresentation(selectedList.value)).let { options ->
-            makeState(repository.snapshot.value, selectedList.value, options.showCompleted, LocalDate.now(clock), homeSection.value, options)
+        resolveSelection(repository.snapshot.value, selectedList.value).let { destination ->
+            val options = taskPresentation(preferences.snapshot.value.preferences["tasks:$destination"], defaultPresentation(destination))
+            makeState(repository.snapshot.value, destination, options.showCompleted, LocalDate.now(clock), homeSection.value, options)
                 .withAlertPause(reminders.reminderState.value.pause.resumeDate)
                 .copy(calendarShowCompleted = preferences.snapshot.value.preferences["calendar"]?.let(::JSONObject)?.optBoolean("showCompleted") ?: false)
         },
@@ -86,6 +88,14 @@ class TasksViewModel(
     private fun TasksUiState.withAlertPause(storedDate: LocalDate?): TasksUiState {
         val resumeDate = storedDate?.takeIf { it > today }
         return copy(dailyAlertsEnabled = resumeDate == null, alertsResumeDate = resumeDate)
+    }
+
+    private fun resolveSelection(snapshot: TaskSnapshot, selection: String): String = when {
+        selection == "today" -> selection
+        selection.startsWith("tag:") -> snapshot.knownTags.firstOrNull { it.name.equals(selection.removePrefix("tag:"), true) }
+            ?.let { "tag:${it.name}" } ?: "inbox"
+        selection.startsWith("filter:") -> selection.takeIf { key -> snapshot.filters.any { it.id == key.removePrefix("filter:") } } ?: "inbox"
+        else -> selection.takeIf { key -> snapshot.lists.any { it.id == key } } ?: "inbox"
     }
 
     private fun defaultPresentation(selection: String) = TaskPresentation(
@@ -133,7 +143,7 @@ class TasksViewModel(
         preferences.updatePreference("calendar") { old -> (old?.let(::JSONObject) ?: JSONObject()).let { it.put("showCompleted", !it.optBoolean("showCompleted")).toString() } }
     }
     private fun persistNavigation() {
-        val json = JSONObject().put("filter", selectedList.value).put("section", homeSection.value).toString()
+        val json = JSONObject().put("filter", resolveSelection(repository.snapshot.value, selectedList.value)).put("section", homeSection.value).toString()
         writePreference { preferences.updatePreference("taskNavigation") { json } }
     }
     fun setDailyAlertsEnabled(enabled: Boolean) = writeTask {
@@ -145,7 +155,7 @@ class TasksViewModel(
     }
     fun toggleSort() = updatePresentation { it.copy(sorting = if (it.sorting == TaskSorting.Date) TaskSorting.Created else TaskSorting.Date) }
     fun updatePresentation(transform: (TaskPresentation) -> TaskPresentation) {
-        val id = selectedList.value
+        val id = resolveSelection(repository.snapshot.value, selectedList.value)
         writePreference { preferences.updatePreference("tasks:$id") { transform(taskPresentation(it, defaultPresentation(id))).encode() } }
     }
     private fun writePreference(action: suspend () -> Unit) {
