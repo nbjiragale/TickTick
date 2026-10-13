@@ -241,26 +241,26 @@ Weekly periods start Monday; partial weeks require at most their unarchived elig
 
 ### B7 — Focus persistence
 
-- [ ] Introduce a Focus repository for session configuration, notes, task association and history. Preserve current Pomo/Stopwatch counting and foreground-only sound/screen-on behavior.
-- [ ] Persist elapsed baselines and a reboot-aware recovery policy; never compare an old boot's elapsedRealtime value with a new boot's counter.
-- [ ] Schedule completion through a suitable supported Android adapter, cancel/update on pause/stop, and record completion once even if UI and alarm race.
-- [ ] Derive statistics from history; task deletion must not corrupt historical focus records. Background audio/service expansion is a separate product decision.
+- [x] Introduce a Focus repository for session configuration, notes, task association and history. Preserve current Pomo/Stopwatch counting and foreground-only sound/screen-on behavior.
+- [x] Persist elapsed baselines and a reboot-aware recovery policy; never compare an old boot's elapsedRealtime value with a new boot's counter.
+- [x] Schedule completion through a suitable supported Android adapter, cancel/update on pause/stop, and record completion once even if UI and alarm race.
+- [x] Derive statistics from history; task deletion must not corrupt historical focus records. Background audio/service expansion is a separate product decision.
 
 **Acceptance:** rotation, tab switches, process recreation, pause/resume, stop and reboot follow documented semantics; completion is counted once; existing notes/history survive restart. Sound and screen-on remain device-verification items.
 
 ### B8 — Backup, restore and maintenance
 
-- [ ] Export a versioned JSON snapshot via user-selected local storage, including durable records/settings/history. Document that V1 JSON includes attachment metadata, not media bytes.
-- [ ] Validate schema version, field values, IDs/references, sizes and file availability before restore; reject unsupported newer formats without changing current data.
-- [ ] Implement deliberate replace-all restore with an in-app confirmation and pre-restore recovery snapshot. Apply database changes transactionally, then invalidate old alarms and reconcile restored state.
-- [ ] Use WorkManager only for deferrable cleanup/reconciliation/backup maintenance. Honor offline-only scope in manifest cloud-backup and extraction rules; decide device-transfer behavior explicitly.
+- [x] Export a versioned JSON snapshot via user-selected local storage, including durable records/settings/history. Document that V1 JSON includes attachment metadata, not media bytes.
+- [x] Validate schema version, field values, IDs/references, sizes and file availability before restore; reject unsupported newer formats without changing current data.
+- [x] Implement deliberate replace-all restore with an in-app confirmation and pre-restore recovery snapshot. Apply database changes transactionally, then invalidate old alarms and reconcile restored state.
+- [x] Use WorkManager only for deferrable cleanup/reconciliation/backup maintenance. Honor offline-only scope in manifest cloud-backup and extraction rules; decide device-transfer behavior explicitly.
 
 **Acceptance:** round trip retains IDs, schedules, history and preferences; malformed/interrupted restore leaves prior data usable; missing media is disclosed; cancelled restore has no side effects; restored alarms do not duplicate old deliveries.
 
 ### B9 — Production completion
 
-- [ ] Verify production AppContainer uses durable task/habit/focus/settings/draft stores and real adapters; keep simulator controls and sample seeding isolated from release.
-- [ ] Complete migrations, error/loading/retry handling and safe diagnostics without logging private titles, notes or media.
+- [x] Verify production AppContainer uses durable task/habit/focus/settings/draft stores and real adapters; keep simulator controls and sample seeding isolated from release.
+- [x] Complete migrations, error/loading/retry handling and safe diagnostics without logging private titles, notes or media.
 - [ ] Complete the validation matrix below and record device/OS/build evidence. Close remaining product decisions and document known platform limits.
 
 **Acceptance:** all approved backend journeys work offline across restart and upgrades, with no known data-loss path; reminder reliability has device evidence; unresolved verification is listed explicitly. UI screenshot acceptance remains separately tracked.
@@ -395,3 +395,7 @@ Organization edit/delete now uses the existing task menu and repository transact
 Room-backed app preferences now control visible tab order, light-theme accent, calendar week start, time labels, default list and date-only reminder time for new tasks. Existing schedules and habit history rules do not change. Committed habit completion triggers reduced-motion-aware confetti; opening already completed history does not replay it.
 
 Changed areas: domain repository and mutation coordinator, DAO/mapper, organization editors/menu, `core/settings`, settings UI, calendar/schedule/task/reminder time labels and habit completion UI. Debug assembly passed in 1m 37s (7 executed, 31 up-to-date), log `/tmp/settings-build.log`. Device behavior remains unverified. Next: final reliability review and debug/release assembly.
+
+### Reliability follow-up — 2026-10-13
+
+Restore advances saved draft revision baselines together with task/habit revisions, preserving true conflicts without making every restored edit stale. The activity resets even if post-commit reload fails. Filter writes reject removed list conditions. Static schema comparison confirms all 22 schema-5 tables remain unchanged; schema 6 adds only Focus session/history. The first CI run stopped in SDK setup because the action's default `tools` package is retired; the workflow now selects current command-line tools and `platform-tools` explicitly. Final debug/release assembly and rerun CI are in progress.

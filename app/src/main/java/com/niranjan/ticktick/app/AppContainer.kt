@@ -40,10 +40,11 @@ class AppContainer(application: Application) {
         beforeReplace = { reminderController.cancelForRestore(database.reminders().deliveries().map { it.id }) },
         afterReplace = { replaced ->
             if (replaced) {
-                taskStore.reloadAfterRestore()
-                (uiStateRepository as com.niranjan.ticktick.data.repository.RoomUiStateRepository).reloadAfterRestore()
-                (focusRepository as com.niranjan.ticktick.data.repository.RoomFocusRepository).reloadAfterRestore()
-                restoreEpoch.value += 1
+                try {
+                    taskStore.reloadAfterRestore()
+                    (uiStateRepository as com.niranjan.ticktick.data.repository.RoomUiStateRepository).reloadAfterRestore()
+                    (focusRepository as com.niranjan.ticktick.data.repository.RoomFocusRepository).reloadAfterRestore()
+                } finally { restoreEpoch.value += 1 }
             }
             reminderController.requestReconcile(force = true)
         })

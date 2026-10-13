@@ -148,11 +148,22 @@ internal class TaskMutation(initial: TaskSnapshot, private val clock: Clock = Cl
         }
     }
 
+    private fun validateRules(rules: List<FilterRule>, current: TaskSnapshot) {
+        require(rules.isNotEmpty()) { "Add at least one condition." }
+        rules.forEach { rule -> when (rule.field) {
+            FilterField.List -> require(current.lists.any { it.id == rule.value }) { "A selected list was removed. Choose another condition." }
+            FilterField.Tag -> require(rule.value.isNotBlank()) { "Choose a tag." }
+            FilterField.Date -> FilterDate.valueOf(rule.value)
+            FilterField.Priority -> TaskPriority.valueOf(rule.value)
+        } }
+    }
+
     fun addFilter(name: String, rules: List<FilterRule>, matchAll: Boolean): String {
         val trimmed = name.trim()
         require(trimmed.isNotEmpty() && rules.isNotEmpty()) { "Enter a name and add at least one condition." }
         val id = UUID.randomUUID().toString()
         update { current ->
+            validateRules(rules, current)
             require(current.filters.none { it.name.equals(trimmed, true) }) { "A filter with this name already exists." }
             current.copy(filters = current.filters + SavedTaskFilter(id, trimmed, rules.toList(), matchAll))
         }
@@ -224,6 +235,7 @@ internal class TaskMutation(initial: TaskSnapshot, private val clock: Clock = Cl
         val trimmed = name.trim()
         require(trimmed.isNotBlank() && rules.isNotEmpty()) { "Enter a name and add at least one condition." }
         update { current ->
+            validateRules(rules, current)
             require(current.filters.any { it.id == id }) { "This filter was removed." }
             require(current.filters.none { it.id != id && it.name.equals(trimmed, true) }) { "A filter with this name already exists." }
             current.copy(filters = current.filters.map { if (it.id == id) it.copy(name = trimmed, rules = rules.toList(), matchAll = matchAll) else it })

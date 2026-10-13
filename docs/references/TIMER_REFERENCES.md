@@ -1,5 +1,7 @@
 # Timer references — 2026-09-12
 
+Current implementation update (2026-10-13): Focus now uses Room schema 6 for sessions/history, same-boot elapsed-time recovery, paused reboot recovery and background completion alarms. Local JSON backup/restore, persistent app settings and organization edit/delete are implemented. See [backend tracker](../BACKEND_IMPLEMENTATION_PLAN.md) for build evidence and pending device acceptance. Historical statements below about deferred Focus persistence or missing settings are superseded; foreground-only audio and the explicit product exclusions remain in effect.
+
 ## Source and approved scope
 
 - [Idle Pomo](timer-idle.jpg): `photo_2026-09-12_12-09-21.jpg`.

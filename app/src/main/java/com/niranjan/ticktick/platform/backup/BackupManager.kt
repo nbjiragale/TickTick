@@ -187,7 +187,18 @@ class BackupManager(private val context: Context, private val database: TickTick
                                 phase = if (value.phase == FocusPhase.Running) FocusPhase.Paused else value.phase,
                                 startedAt = 0, bootCount = -1, completionPending = false).encodeFocus()))
                         }
-                        database.uiState().drafts().forEach { database.uiState().putDraft(it.copy(sessionId = UUID.randomUUID().toString())) }
+                        database.uiState().drafts().forEach { draft ->
+                            // Preserve the draft's revision difference from its owner, including genuine conflicts.
+                            val payload = if (draft.key == "habit" && draft.payload != null) {
+                                JSONObject(draft.payload).apply {
+                                    val habit = getString("habit").decodeHabit()
+                                    if (habit.revision > 0) put("habit", habit.copy(revision = habit.revision + revision).encodeHabit())
+                                }.toString()
+                            } else draft.payload
+                            database.uiState().putDraft(draft.copy(sessionId = UUID.randomUUID().toString(),
+                                baseRevision = if (draft.baseRevision > 0) draft.baseRevision + revision else 0,
+                                payload = payload))
+                        }
                     }
                     replaced = true; database.generation += 1
                     (ui as? com.niranjan.ticktick.data.repository.RoomUiStateRepository)?.clearPendingDraftsAfterRestore()

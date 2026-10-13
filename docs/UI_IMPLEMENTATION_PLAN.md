@@ -1,5 +1,7 @@
 # End-to-end UI implementation plan
 
+Current implementation update (2026-10-13): Focus now uses Room schema 6 for sessions/history, same-boot elapsed-time recovery, paused reboot recovery and background completion alarms. Local JSON backup/restore, persistent app settings and organization edit/delete are implemented. See [backend tracker](BACKEND_IMPLEMENTATION_PLAN.md) for build evidence and pending device acceptance. Historical statements below about deferred Focus persistence or missing settings are superseded; foreground-only audio and the explicit product exclusions remain in effect.
+
 Backend planning update (2026-09-16): backend work is tracked separately in the [backend implementation plan](BACKEND_IMPLEMENTATION_PLAN.md). Read its session checkpoint first in new sessions; this UI checklist remains the record of UI scope and acceptance, not backend completion.
 
 Timer increment — 2026-09-12: the supplied idle/running references replace the Timer placeholder with Pomo/Stopwatch, progress ring, expanded controls, screen-always-on and focus notes. The user approves provisional functional dialogs for duration, statistics, task selection, sound and More. See [Timer notes](references/TIMER_REFERENCES.md). Existing four-tab navigation is retained; backend background delivery and durable history remain deferred. Build-only verification applies.
