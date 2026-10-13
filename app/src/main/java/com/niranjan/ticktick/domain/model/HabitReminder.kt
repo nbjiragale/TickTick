@@ -15,8 +15,10 @@ fun TaskSnapshot.withHabitReminders(habits: HabitSnapshot, clock: Clock): TaskSn
     val today = LocalDate.now(clock)
     val projected = (0L..7L).flatMap { offset ->
         val day = today.plusDays(offset)
+        // Checking in ends the active delivery's repeats, not later selected times.
+        // habitsFor still enforces scheduled days, archive state and goal eligibility.
         habits.habitsFor(day).filter { habit -> habit.reminders.isNotEmpty() &&
-            day !in habits.completedDates[habit.id].orEmpty() && !habits.configurationOn(habit, day).archived }.map { habit ->
+            !habits.configurationOn(habit, day).archived }.map { habit ->
             val rule = habits.configurationOn(habit, day)
             val identity = listOf(habit.reminderVersion, day, rule.startDate, rule.frequency,
                 rule.weekdays.sortedBy { it.value }, rule.frequencyCount, rule.amount, rule.goalDays).joinToString("|")

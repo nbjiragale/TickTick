@@ -4,15 +4,17 @@ Created: 2026-09-16. Scope: the offline Android backend in this repository.
 
 ## Session checkpoint
 
-**Current state (2026-10-13):** B1–B8 are implemented with runtime acceptance pending. Schema 6 adds durable Focus session/history. Local JSON export/restore validates through a staging database, preserves a pre-restore recovery copy and replaces data atomically. The resumed implementation is checkpointed on `codex/complete-offline-app` in draft PR #1.
+**Current state (2026-10-13):** B1–B9 implementation is pushed in draft PR #1 with device acceptance pending. Habit multiple-time delivery now retains later selected times after daily completion and handles subsequent foreground popups while an earlier log remains open. No schema change; schema remains 6.
 
-**Next action:** review [draft PR #1](https://github.com/nbjiragale/TickTick/pull/1). When device verification is authorized, install the debug APK and execute the prioritized acceptance checklist in `IMPLEMENTATION_AUDIT.md`, beginning with upgrade, backup/restore and Focus recovery.
+**Next action:** review the habit multiple-time correction in [draft PR #1](https://github.com/nbjiragale/TickTick/pull/1). When device checks are authorized, verify three selected times after dismiss/partial/full check-in, with the first log left open, then background/restart behavior. The wider acceptance checklist remains in `IMPLEMENTATION_AUDIT.md`.
 
 **Current milestone:** B9 production wiring implemented; debug/release builds and CI passed, device acceptance pending. Existing explicit feature exclusions remain unchanged.
 
 **Blockers:** no implementation blocker. Android notification/channel/DND settings remain authoritative. The build-only verification restriction remains active.
 
-**Validation:** final source commit `6db870c` passed JDK 21 `:app:assembleDebug :app:assembleRelease -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain` in 6m 18s (55 executed, 33 up-to-date), including release lint-vital checks. Log: `build/offline-completion-build.log` (local, ignored). APKs: `app/build/outputs/apk/debug/app-debug.apk` and `app/build/outputs/apk/release/app-release-unsigned.apk`. No Kotlin warnings; one non-fatal lint analytics warning concerned the sandbox's unwritable home directory. [GitHub CI passed and uploaded APKs](https://github.com/nbjiragale/TickTick/actions/runs/38350214840). Static schema comparison preserved all 22 schema-5 tables and matched both new migration CREATE statements to Room's export. No unit, instrumentation, emulator or device tests ran. The earlier user's popup success report remains distinct from the pending broader acceptance matrix. No merge or release publication performed.
+**Latest validation:** habit reminder correction passed JDK 21 debug and release assembly, including release lint-vital checks, in 3m 31s. Command: `:app:assembleDebug :app:assembleRelease -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain`. Log: `build/habit-multiple-times-build.log` (local, ignored). No Kotlin warnings, unit/instrumentation/emulator/device tests. Source tracing establishes the suppression paths; this does not establish delivery on the user's phone.
+
+**Previous validation:** final source commit `6db870c` passed JDK 21 `:app:assembleDebug :app:assembleRelease -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain` in 6m 18s (55 executed, 33 up-to-date), including release lint-vital checks. Log: `build/offline-completion-build.log` (local, ignored). APKs: `app/build/outputs/apk/debug/app-debug.apk` and `app/build/outputs/apk/release/app-release-unsigned.apk`. No Kotlin warnings; one non-fatal lint analytics warning concerned the sandbox's unwritable home directory. [GitHub CI passed and uploaded APKs](https://github.com/nbjiragale/TickTick/actions/runs/38350214840). Static schema comparison preserved all 22 schema-5 tables and matched both new migration CREATE statements to Room's export. No unit, instrumentation, emulator or device tests ran. The earlier user's popup success report remains distinct from the pending broader acceptance matrix. No merge or release publication performed.
 
 **Scope decisions:** the user authorized implementation after the planning request. Use the existing offline/local product architecture. No server, account system, cloud sync, subscriptions, or network API is needed for V1. Backend implementation proceeds ahead of unfinished UI acceptance; it does not mark the UI gate complete.
 
@@ -403,3 +405,13 @@ Restore advances saved draft revision baselines together with task/habit revisio
 ### Final delivery checkpoint — 2026-10-13
 
 Implemented and pushed: Focus (`92a871b`), backup/restore (`01009c7`), local settings/organization/feedback/build workflow (`c43b025`), and restore/filter/CI reliability fixes (`6db870c`). All implementation changes are reviewable in PR #1. Final local debug/release assembly and CI passed as recorded above. Documentation-only follow-up records this evidence; device/runtime and screenshot acceptance remain pending, with explicit deferred product features listed in the audit.
+
+### Habit multiple-time reminder correction — 2026-10-13
+
+User report: not all selected habit times produce reminders. Static tracing found two suppression paths: `withHabitReminders` excluded an entire completed day, causing pending times to become suppressed; `TickTickApp` held `autoHabitOpen` until the old log closed, while the foreground platform adapter hid notifications for automatic popups. The timing list and per-time PendingIntent identities already retained every selected time.
+
+The implementation now retains later selected times after daily completion, stops only the active repeat cycle on check-in/dismissal, and consumes each new foreground delivery even when an earlier log is open. Actual delivery time is used in notification labels. Completed-day notifications omit quick Check in, and stale Check in actions dismiss without adding quantity. Archive, schedule, pause, missed-alert catch-up and weekly/finite-goal eligibility remain authoritative. No schema migration is required. This supersedes the earlier B4 policy that daily completion cancels the remaining times.
+
+Changed files: `domain/model/HabitReminder.kt`, `data/repository/ReminderStore.kt`, `data/repository/RoomTaskRepository.kt`, `app/TickTickApp.kt`; habit reference/audit/tracker documentation. Pending device checks include dismiss/partial/full check-in at the first of three times, leaving the first log open or switching tabs, background/lock-screen delivery, process restart, constant repeats, stale Check in, archive/Undo and goal boundaries. Build-only validation remains in effect.
+
+**Habit correction build result:** debug and unsigned release APK assembly passed in 3m 31s; `git diff --check` passed. Device validation remains pending.

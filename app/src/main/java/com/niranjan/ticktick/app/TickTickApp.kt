@@ -198,15 +198,13 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
     var requestedHabitId by rememberSaveable { mutableStateOf<String?>(null) }
     var requestedHabitDay by rememberSaveable { mutableStateOf<Long?>(null) }
     var returnToTasksFromHabit by rememberSaveable { mutableStateOf(false) }
-    var autoHabitOpen by rememberSaveable { mutableStateOf(false) }
     val reminderSnapshot by container.reminderRepository.reminderState.collectAsStateWithLifecycle()
     suspend fun openHabitAlert(alert: ReminderAlert, autoSound: Boolean = false): Boolean {
         val target = habitReminderTarget(alert.taskId) ?: return false
         if (!container.reminderRepository.actOnReminder(alert.id, alert.revision, ReminderAction.Dismiss)) return false
-        autoHabitOpen = true
         requestedHabitId = target.habitId
         requestedHabitDay = target.date.toEpochDay()
-        returnToTasksFromHabit = selectedTab == AppTab.Tasks
+        if (selectedTab != AppTab.Habits) returnToTasksFromHabit = selectedTab == AppTab.Tasks
         selectedTab = AppTab.Habits
         if (autoSound) container.sounds.play(com.niranjan.ticktick.domain.model.AppSound.Popup)
         return true
@@ -225,8 +223,10 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
             onReminderRequestHandled()
         }
     }
-    LaunchedEffect(reminderSnapshot.alerts, autoHabitOpen, reminderRequest, lifecycleState) {
-        if (lifecycleState == androidx.lifecycle.Lifecycle.State.RESUMED && !autoHabitOpen && reminderRequest == null) {
+    // Each selected time has its own committed delivery. A previously opened log must
+    // not suppress later deliveries; dismissing the selected delivery prevents replay.
+    LaunchedEffect(reminderSnapshot.alerts, reminderRequest, lifecycleState) {
+        if (lifecycleState == androidx.lifecycle.Lifecycle.State.RESUMED && reminderRequest == null) {
             val alert = reminderSnapshot.alerts.firstOrNull { alert ->
                 val target = habitReminderTarget(alert.taskId)
                 !alert.missed && target != null && habitSnapshot.habits.any { it.id == target.habitId && it.autoPopUp }
@@ -343,7 +343,6 @@ fun TickTickApp(container: AppContainer, reminderRequest: com.niranjan.ticktick.
                         AppTab.Focus -> FocusScreen(focusState, focus, state.snapshot.tasks, focusDeliveryError, container.focusController::retry)
                         AppTab.Habits -> HabitsScreen(container.sounds, container.habitRepository, container.clock, container.uiStateRepository, requestedHabitId, requestedHabitDay,
                             onExternalDetailClosed = {
-                                autoHabitOpen = false
                                 if (returnToTasksFromHabit) selectedTab = AppTab.Tasks
                                 returnToTasksFromHabit = false
                             }, onRequestHandled = { requestedHabitId = null; requestedHabitDay = null }, currentDate = state.today)

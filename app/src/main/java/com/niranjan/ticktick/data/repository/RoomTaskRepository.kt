@@ -196,6 +196,12 @@ class RoomTaskRepository(private val database: TickTickDatabase, private val clo
                 val habit = stored.habits.find { it.id == target.habitId } ?: return@reminderTransaction false
                 if (action == ReminderAction.Dismiss) reminders.dismissHabitDay(delivery.taskId)
                 else if (action == ReminderAction.Done) {
+                    // A later selected time may remind an already completed day. A stale
+                    // Check in action must acknowledge it without recording extra quantity.
+                    if (target.date in stored.completedDates[habit.id].orEmpty()) {
+                        reminders.dismissHabitDay(delivery.taskId)
+                        return@reminderTransaction true
+                    }
                     val rule = stored.configurationOn(habit, target.date)
                     if (!stored.canRecord(habit, target.date, java.time.LocalDate.now(clock)) ||
                         rule.amount != null && habit.recordMode == HabitRecordMode.Manual) return@reminderTransaction false

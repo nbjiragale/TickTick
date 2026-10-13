@@ -142,8 +142,13 @@ internal class ReminderStore(private val dao: ReminderDao, private val clock: Cl
             ReminderEffect(row.id, row.taskId, row.revision,
                 row.alarmAt?.takeIf { valid && !isPaused }?.let(Instant::ofEpochMilli),
                 valid && !isPaused && row.status == "delivered", row.missed, task?.title.orEmpty(),
-                task?.dueDate?.toString().orEmpty() + (task?.dueTime?.let { " $it" } ?: ""), row.alertAgain, target, habits.settings.ringtoneUri, habit?.autoPopUp == true,
-                habit?.let { habits.configurationOn(it, target!!.date).amount == null || it.recordMode == HabitRecordMode.Auto } ?: true, habits.settings.countInAppBadge)
+                if (target != null) Instant.ofEpochMilli(row.originalAt).atZone(clock.zone).let {
+                    "${it.toLocalDate()} ${it.toLocalTime().format(com.niranjan.ticktick.core.settings.AppDisplay.timeFormatter)}"
+                } else task?.dueDate?.toString().orEmpty() + (task?.dueTime?.let { " $it" } ?: ""),
+                row.alertAgain, target, habits.settings.ringtoneUri, habit?.autoPopUp == true,
+                habit?.let { target!!.date !in habits.completedDates[it.id].orEmpty() &&
+                    (habits.configurationOn(it, target.date).amount == null || it.recordMode == HabitRecordMode.Auto) } ?: true,
+                habits.settings.countInAppBadge)
         }, preferences().resumeDate?.let(LocalDate::parse)?.takeIf { it > LocalDate.now(clock) }
             ?.atStartOfDay(clock.zone)?.toInstant().let { pauseWake ->
                 val dayWake = if (habits.habits.any { !it.archived && it.reminders.isNotEmpty() }) LocalDate.now(clock).plusDays(1).atStartOfDay(clock.zone).toInstant() else null
